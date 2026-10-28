@@ -324,7 +324,20 @@ function updateEnergyNote() {
   }
 }
 
+function renderReviewFields() {
+  const host = document.getElementById("review-nutrient-grid");
+  if (!host) return;
+  const required = new Set(["caloriesKcal", "proteinG", "carbsG", "fatG"]);
+  host.innerHTML = NUTRIENTS.map(function (nutrient) {
+    return '<div class="nutrient-input"><label for="field-' + escapeHtml(nutrient.key) + '">' +
+      escapeHtml(nutrient.name) + ' <small>' + escapeHtml(nutrient.unit) + '</small></label>' +
+      '<input id="field-' + escapeHtml(nutrient.key) + '" type="number" min="0" max="10000000" step="any"' +
+      (required.has(nutrient.key) ? ' required' : '') + '></div>';
+  }).join("");
+}
+
 function fillReview(result) {
+  renderReviewFields();
   pendingAnalysis = result;
   const nutrition = result.nutrition || {};
   document.getElementById("review-food-name").value = result.foodName || "";
