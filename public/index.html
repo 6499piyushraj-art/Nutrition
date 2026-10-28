@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f8f4">
+  <meta name="description" content="A personal AI-assisted nutrition tracker and calculator.">
+  <title>MyNutri AI · Nutrition dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="/" aria-label="MyNutri AI dashboard">
+        <span class="brand-mark" aria-hidden="true">✳</span>
+        <span><strong>myNutri</strong><small>AI NUTRITION</small></span>
+      </a>
+      <div class="nav-caption">WORKSPACE</div>
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="dashboard"><span>◫</span> Dashboard</button>
+        <button class="nav-item" data-view="log"><span>＋</span> Log food <span class="nav-add">+</span></button>
+        <button class="nav-item" data-view="nutrients"><span>◉</span> Nutrient analysis</button>
+        <button class="nav-item" data-view="history"><span>▤</span> History</button>
+        <button class="nav-item" data-view="settings"><span>⚙</span> Settings</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="privacy-note"><span class="privacy-dot"></span><div><strong>Private by design</strong><small>Your log stays on this device</small></div></div>
+        <div class="sidebar-user"><span class="avatar">P</span><span><strong>Personal workspace</strong><small id="sidebar-date">Today</small></span><button id="logout-button" class="icon-button" type="button" title="Sign out" aria-label="Sign out">↪</button></div>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <button id="menu-toggle" class="icon-button mobile-menu" type="button" aria-label="Open navigation">☰</button>
+        <div class="breadcrumb"><span>Workspace</span><span class="crumb-sep">/</span><strong id="current-page-title">Dashboard</strong></div>
+        <div class="topbar-right"><span class="status-pill"><span></span> Gemini connected</span><button class="avatar avatar-small" data-view="settings" type="button" aria-label="Open settings">P</button></div>
+      </header>
+
+      <div class="page-wrap">
+        <section class="view active" id="view-dashboard" aria-labelledby="dashboard-heading">
+          <div class="page-heading heading-row">
+            <div><p class="eyebrow">YOUR DAILY OVERVIEW</p><h1 id="dashboard-heading">Good food. Better insight.</h1><p class="muted">Your nutrition picture, one meal at a time.</p></div>
+            <div class="date-control"><span class="date-icon">▦</span><input id="dashboard-date" aria-label="Dashboard date" type="date"></div>
+          </div>
+          <div class="hero-strip">
+            <div><span class="hero-tag">TODAY'S FOCUS</span><h2>Progress, not perfection.</h2><p>Log meals in your own words. AI can estimate the nutrients; you review everything before saving.</p><button class="button button-light" data-view="log" type="button">Log a meal <span>→</span></button></div>
+            <div class="hero-art" aria-hidden="true"><div class="plate plate-outer"><div class="plate-leaf leaf-a"></div><div class="plate-leaf leaf-b"></div><div class="plate-leaf leaf-c"></div><div class="plate-center">✳</div></div><span class="orbit orbit-one"></span><span class="orbit orbit-two"></span></div>
+          </div>
+          <div class="section-title-row"><div><h2>Today's nutrition</h2><p class="muted small">Estimates from the foods you've logged</p></div><button class="text-button" data-view="nutrients" type="button">View nutrients ↗</button></div>
+          <div class="metric-grid">
+            <article class="metric-card metric-energy"><div class="metric-top"><span class="metric-icon">◉</span><span class="metric-label">Energy</span><span class="metric-unit">kcal</span></div><div class="metric-number"><strong id="total-calories">0</strong><span id="calorie-target-label">/ 2,400</span></div><div class="progress-track"><span id="calorie-progress" class="progress-fill"></span></div><p id="calorie-remaining" class="metric-foot">Daily target is editable</p></article>
+            <article class="metric-card"><div class="metric-top"><span class="metric-icon icon-protein">↗</span><span class="metric-label">Protein</span><span class="metric-unit">g</span></div><div class="metric-number"><strong id="total-protein">0</strong><span id="protein-target-label">/ 80</span></div><div class="progress-track"><span id="protein-progress" class="progress-fill fill-protein"></span></div><p class="metric-foot">A building block for the body</p></article>
+            <article class="metric-card"><div class="metric-top"><span class="metric-icon icon-carbs">⌁</span><span class="metric-label">Carbohydrates</span><span class="metric-unit">g</span></div><div class="metric-number"><strong id="total-carbs">0</strong><span id="carbs-target-label">/ 300</span></div><div class="progress-track"><span id="carbs-progress" class="progress-fill fill-carbs"></span></div><p class="metric-foot">Energy from your meals</p></article>
+            <article class="metric-card"><div class="metric-top"><span class="metric-icon icon-fat">◌</span><span class="metric-label">Fat</span><span class="metric-unit">g</span></div><div class="metric-number"><strong id="total-fat">0</strong><span id="fat-target-label">/ 75</span></div><div class="progress-track"><span id="fat-progress" class="progress-fill fill-fat"></span></div><p class="metric-foot">Helps absorb some vitamins</p></article>
+          </div>
+          <div class="dashboard-columns">
+            <section class="panel">
+              <div class="panel-heading"><div><h2>Meal timeline</h2><p class="muted small" id="timeline-caption">Your foods will appear here</p></div><button class="text-button" data-view="history" type="button">See history</button></div>
+              <div id="timeline-list" class="timeline-list"><div class="empty-state"><span class="empty-icon">＋</span><strong>No meals logged yet</strong><p>Start with a meal description or photo.</p><button class="button button-outline" data-view="log" type="button">Add first meal</button></div></div>
+            </section>
+            <section class="panel target-panel">
+              <div class="panel-heading"><div><h2>Daily targets</h2><p class="muted small">Personalize in Settings</p></div><span class="target-icon">✳</span></div>
+              <div id="target-summary" class="target-summary"></div>
+              <div class="target-note"><span>ⓘ</span><p>Targets are guides, not pass/fail scores. Needs vary with age, activity, health and growth.</p></div>
+              <button class="button button-outline full-width" data-view="settings" type="button">Adjust your targets</button>
+            </section>
+          </div>
+          <p class="disclaimer">AI-generated estimates can be inaccurate. Check labels or reliable food-composition references when precision matters. This tool does not provide medical advice.</p>
+        </section>
+
+        <section class="view" id="view-log" aria-labelledby="log-heading">
+          <div class="page-heading"><p class="eyebrow">FOOD JOURNAL</p><h1 id="log-heading">Log a meal</h1><p class="muted">Describe what you ate in English, Hindi, or Hinglish—or add a photo.</p></div>
+          <div class="log-layout">
+            <section class="panel input-panel">
+              <div class="panel-heading"><div><h2>What did you eat?</h2><p class="muted small">Include portion sizes for a better estimate.</p></div><span class="ai-chip">✳ Gemini AI</span></div>
+              <form id="analyze-form">
+                <label for="food-description">Meal description</label>
+                <textarea id="food-description" rows="4" maxlength="2000" placeholder="e.g. 2 medium roti, 1 bowl moong dal, 1 cup cooked rice and a small bowl of curd" spellcheck="true"></textarea>
+                <div class="example-prompts"><span>Try:</span><button class="example-chip" type="button" data-example="2 roti, 1 bowl dal, 1 cup cooked rice">Roti + dal + rice</button><button class="example-chip" type="button" data-example="1 glass cow milk and 1 medium banana">Milk + banana</button><button class="example-chip" type="button" data-example="1 plate poha with peanuts">Poha</button></div>
+                <div class="upload-zone" id="upload-zone">
+                  <input id="food-photo" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+                  <div class="upload-symbol">▧</div><div class="upload-copy"><strong>Attach a meal photo</strong><p>JPG, PNG or WebP · processed for analysis, not saved to the server</p></div>
+                  <button class="button button-outline" id="choose-photo" type="button">Choose photo</button>
+                </div>
+                <div id="photo-preview" class="photo-preview" hidden><img id="photo-preview-image" alt="Selected meal preview"><div><strong id="photo-file-name">Meal photo</strong><small>Ready to analyze</small></div><button id="remove-photo" class="icon-button" type="button" aria-label="Remove photo">×</button></div>
+                <div class="form-grid">
+                  <div><label for="entry-date">Meal date</label><input id="entry-date" type="date" required></div>
+                  <div><label for="entry-meal">Meal type</label><select id="entry-meal"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select></div>
+                </div>
+                <button id="analyze-button" class="button button-primary full-width analyze-button" type="submit"><span>✳</span> Analyze with Gemini <span class="button-arrow">→</span></button>
+                <p class="small muted form-helper">The AI fills in an editable estimate. Review the serving and nutrients before saving.</p>
+                <p id="analyze-error" class="form-error" role="alert" aria-live="polite"></p>
+              </form>
+            </section>
+            <aside class="panel how-panel"><div class="how-number">01</div><h3>Describe</h3><p>Write the foods and approximate portions, or select a photo.</p><div class="how-line"></div><div class="how-number">02</div><h3>Review</h3><p>Gemini suggests nutrition estimates. You can edit every value.</p><div class="how-line"></div><div class="how-number">03</div><h3>Save</h3><p>Confirm to add it to your history and update your daily totals.</p><div class="review-note"><span>ⓘ</span><p>Photo-based portion estimates can be uncertain. Add details such as bowl size, number of rotis, oil, or recipe ingredients where possible.</p></div></aside>
+          </div>
+          <section id="review-panel" class="panel review-panel" hidden>
+            <div class="panel-heading"><div><p class="eyebrow">CHECK BEFORE SAVING</p><h2>Review your meal</h2><p class="muted small">These values were estimated by AI. Edit anything that looks wrong.</p></div><span id="confidence-pill" class="confidence-pill">Estimate</span></div>
+            <form id="save-form">
+              <div class="form-grid review-name-grid"><div><label for="review-food-name">Food / meal name</label><input id="review-food-name" maxlength="120" required></div><div><label for="review-serving">Portion / serving</label><input id="review-serving" maxlength="120" required></div></div>
+              <div class="review-nutrient-grid">
+                <div class="nutrient-input"><label for="field-caloriesKcal">Energy <small>kcal</small></label><input id="field-caloriesKcal" type="number" min="0" max="100000" step="1" required></div>
+                <div class="nutrient-input"><label for="field-proteinG">Protein <small>g</small></label><input id="field-proteinG" type="number" min="0" max="10000" step="0.1" required></div>
+                <div class="nutrient-input"><label for="field-carbsG">Carbs <small>g</small></label><input id="field-carbsG" type="number" min="0" max="10000" step="0.1" required></div>
+                <div class="nutrient-input"><label for="field-fatG">Fat <small>g</small></label><input id="field-fatG" type="number" min="0" max="10000" step="0.1" required></div>
+                <div class="nutrient-input"><label for="field-fiberG">Fiber <small>g</small></label><input id="field-fiberG" type="number" min="0" max="10000" step="0.1"></div>
+                <div class="nutrient-input"><label for="field-sugarG">Sugars <small>g</small></label><input id="field-sugarG" type="number" min="0" max="10000" step="0.1"></div>
+                <div class="nutrient-input"><label for="field-sodiumMg">Sodium <small>mg</small></label><input id="field-sodiumMg" type="number" min="0" max="100000" step="1"></div>
+                <div class="nutrient-input"><label for="field-calciumMg">Calcium <small>mg</small></label><input id="field-calciumMg" type="number" min="0" max="100000" step="1"></div>
+                <div class="nutrient-input"><label for="field-ironMg">Iron <small>mg</small></label><input id="field-ironMg" type="number" min="0" max="10000" step="0.1"></div>
+                <div class="nutrient-input"><label for="field-magnesiumMg">Magnesium <small>mg</small></label><input id="field-magnesiumMg" type="number" min="0" max="100000" step="1"></div>
+                <div class="nutrient-input"><label for="field-potassiumMg">Potassium <small>mg</small></label><input id="field-potassiumMg" type="number" min="0" max="100000" step="1"></div>
+                <div class="nutrient-input"><label for="field-zincMg">Zinc <small>mg</small></label><input id="field-zincMg" type="number" min="0" max="10000" step="0.1"></div>
+                <div class="nutrient-input"><label for="field-vitaminCMg">Vitamin C <small>mg</small></label><input id="field-vitaminCMg" type="number" min="0" max="100000" step="0.1"></div>
+                <div class="nutrient-input"><label for="field-vitaminDIu">Vitamin D <small>IU</small></label><input id="field-vitaminDIu" type="number" min="0" max="100000" step="1"></div>
+                <div class="nutrient-input"><label for="field-vitaminB12Mcg">Vitamin B12 <small>µg</small></label><input id="field-vitaminB12Mcg" type="number" min="0" max="100000" step="0.1"></div>
+                <div class="nutrient-input"><label for="field-omega3G">Omega-3 <small>g</small></label><input id="field-omega3G" type="number" min="0" max="10000" step="0.1"></div>
+              </div>
+              <div class="ai-notes"><span>✳</span><div><strong>AI estimate notes</strong><p id="review-notes">Review the ingredients and serving size before saving.</p><p id="review-assumptions" class="small muted"></p></div></div>
+              <div class="review-actions"><button id="discard-review" class="button button-ghost" type="button">Discard</button><button id="save-meal-button" class="button button-primary" type="submit">Save meal to my log <span>→</span></button></div>
+            </form>
+          </section>
+        </section>
+
+        <section class="view" id="view-nutrients" aria-labelledby="nutrients-heading">
+          <div class="page-heading"><p class="eyebrow">BEYOND THE MACROS</p><h1 id="nutrients-heading">Nutrient analysis</h1><p class="muted">A view of selected micronutrients from foods recorded for the chosen day.</p></div>
+          <div class="date-control nutrient-date"><span class="date-icon">▦</span><input id="nutrients-date" aria-label="Nutrient analysis date" type="date"></div>
+          <div class="panel nutrient-explainer"><div class="explainer-icon">✳</div><div><h2>What can we estimate?</h2><p class="muted">Gemini may estimate calcium, iron, magnesium, potassium, zinc, vitamins C and D, B12, sodium and omega-3 where the food description supports it. Blank means unknown—not zero.</p></div></div>
+          <div id="micronutrient-grid" class="micro-grid"></div>
+          <p class="disclaimer">Micronutrients are often harder to estimate than calories and macros. This screen only totals values returned for logged meals; it does not imply an unreported nutrient is absent.</p>
+        </section>
+
+        <section class="view" id="view-history" aria-labelledby="history-heading">
+          <div class="page-heading heading-row"><div><p class="eyebrow">YOUR JOURNAL</p><h1 id="history-heading">Food history</h1><p class="muted">Browse, review, or remove saved meals on this device.</p></div><div class="date-control"><span class="date-icon">⌕</span><input id="history-date" aria-label="Filter history by date" type="date"></div></div>
+          <div class="panel"><div class="panel-heading"><div><h2>Saved meals</h2><p class="muted small" id="history-count">0 meals</p></div><button id="export-csv-button" class="button button-outline" type="button">Export CSV ↓</button></div><div id="history-list" class="history-list"></div></div>
+        </section>
+
+        <section class="view" id="view-settings" aria-labelledby="settings-heading">
+          <div class="page-heading"><p class="eyebrow">YOUR WORKSPACE</p><h1 id="settings-heading">Settings</h1><p class="muted">Adjust targets and manage your local food data.</p></div>
+          <div class="settings-layout">
+            <section class="panel"><div class="panel-heading"><div><h2>Daily reference targets</h2><p class="muted small">Edit these to suit your own guidance.</p></div></div>
+              <form id="targets-form" class="settings-form">
+                <div class="setting-group"><h3>Energy & macros</h3><div class="settings-grid">
+                  <div><label for="target-calories">Energy (kcal)</label><input id="target-calories" type="number" min="1" max="10000" required></div>
+                  <div><label for="target-protein">Protein (g)</label><input id="target-protein" type="number" min="1" max="1000" step="0.1" required></div>
+                  <div><label for="target-carbs">Carbohydrates (g)</label><input id="target-carbs" type="number" min="1" max="2000" step="0.1" required></div>
+                  <div><label for="target-fat">Fat (g)</label><input id="target-fat" type="number" min="1" max="1000" step="0.1" required></div>
+                </div></div>
+                <div class="setting-group"><h3>Selected micronutrients</h3><p class="muted small">These are editable reference values, not personalized medical recommendations.</p><div class="settings-grid">
+                  <div><label for="target-calcium">Calcium (mg)</label><input id="target-calcium" type="number" min="1" max="10000" required></div>
+                  <div><label for="target-iron">Iron (mg)</label><input id="target-iron" type="number" min="1" max="1000" required></div>
+                  <div><label for="target-magnesium">Magnesium (mg)</label><input id="target-magnesium" type="number" min="1" max="10000" required></div>
+                  <div><label for="target-potassium">Potassium (mg)</label><input id="target-potassium" type="number" min="1" max="20000" required></div>
+                  <div><label for="target-zinc">Zinc (mg)</label><input id="target-zinc" type="number" min="1" max="1000" required></div>
+                  <div><label for="target-vitaminC">Vitamin C (mg)</label><input id="target-vitaminC" type="number" min="1" max="10000" required></div>
+                  <div><label for="target-vitaminD">Vitamin D (IU)</label><input id="target-vitaminD" type="number" min="1" max="10000" required></div>
+                  <div><label for="target-b12">Vitamin B12 (µg)</label><input id="target-b12" type="number" min="0.1" max="10000" step="0.1" required></div>
+                  <div><label for="target-omega3">Omega-3 (g)</label><input id="target-omega3" type="number" min="0.1" max="1000" step="0.1" required></div>
+                </div></div>
+                <div id="target-energy-note" class="inline-notice" hidden></div>
+                <button class="button button-primary" type="submit">Save targets</button><p id="target-save-status" class="form-success" aria-live="polite"></p>
+              </form>
+            </section>
+            <aside class="panel data-panel"><h2>Data & privacy</h2><p class="muted small">Your history is stored in this browser, not in a cloud database.</p><button id="export-json-button" class="button button-outline full-width" type="button">Export all data (JSON) ↓</button><button id="import-json-button" class="button button-outline full-width" type="button">Import data (JSON) ↑</button><input id="import-file" type="file" accept="application/json,.json" hidden><div class="danger-zone"><h3>Clear local data</h3><p class="small muted">This removes saved meals and targets from this browser.</p><button id="clear-data-button" class="button button-danger full-width" type="button">Clear all local data</button></div><div class="security-note"><span>♧</span><p>Do not share your app password or place Gemini credentials in any form. The key stays in the server environment.</p></div></aside>
+          </div>
+          <p class="disclaimer">Nutrition reference targets vary by age, sex, health, and local guidance. These settings are provided for tracking only; consult a qualified professional for personal recommendations.</p>
+        </section>
+      </div>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <dialog id="confirm-dialog" class="confirm-dialog"><form method="dialog"><h2 id="confirm-title">Are you sure?</h2><p id="confirm-message">This action cannot be undone.</p><div class="dialog-actions"><button class="button button-ghost" value="cancel">Cancel</button><button id="confirm-accept" class="button button-danger" value="confirm">Confirm</button></div></form></dialog>
+</body>
+</html>
