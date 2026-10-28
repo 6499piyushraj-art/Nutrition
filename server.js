@@ -244,17 +244,6 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function statusCodeFrom(error) {
-  const direct = Number(error?.status || error?.statusCode || error?.response?.status);
-  if (Number.isFinite(direct) && direct > 0) return direct;
-  const match = String(error?.message || "").match(/\\b(400|401|403|404|408|429|500|502|503|504)\\b/);
-  return match ? Number(match[1]) : 0;
-}
-
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function generateWithFallback(client, contents) {
   const configured = process.env.GEMINI_MODEL || "gemini-3.8-flash";
   const models = [...new Set([configured, "gemini-3.8-flash", "gemini-3.5-flash-lite"])];
