@@ -65,11 +65,6 @@ let autoAnalyzeTimer = null;
 let lastAttemptedSignature = "";
 let analysisInProgress = false;
 
-let state = loadState();
-let selectedPhoto = null;
-let pendingAnalysis = null;
-let toastTimer = null;
-
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
