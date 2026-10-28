@@ -3,25 +3,52 @@
 const STORAGE_KEY = "mynutri-ai.v1";
 const DEFAULTS = {
   targets: {
-    caloriesKcal: 2400, proteinG: 80, carbsG: 300, fatG: 75,
-    calciumMg: 1300, ironMg: 11, magnesiumMg: 410, potassiumMg: 3000,
-    zincMg: 11, vitaminCMg: 75, vitaminDIu: 800, vitaminB12Mcg: 2.4, omega3G: 1.6
+    caloriesKcal: 2400, proteinG: 80, carbsG: 300, fatG: 75, omega3G: 1.6, omega6G: 16,
+    calciumMg: 1300, phosphorusMg: 1250, magnesiumMg: 410, potassiumMg: 3000, sodiumMg: 1500, chlorideMg: 2300,
+    zincMg: 11, ironMg: 11, iodineMcg: 150, copperMcg: 890, manganeseMg: 2.2, seleniumMcg: 55,
+    fluorideMg: 3, chromiumMcg: 35, molybdenumMcg: 43, vitaminAMcg: 900, vitaminDIu: 900,
+    vitaminEMg: 15, vitaminKMcg: 75, vitaminCMg: 75, vitaminB1Mg: 1.2, vitaminB2Mg: 1.3,
+    vitaminB3Mg: 16, vitaminB5Mg: 5, vitaminB6Mg: 1.3, vitaminB7Mcg: 30, folateMcg: 400, vitaminB12Mcg: 2.4
   },
   logs: []
 };
 const NUTRIENTS = [
-  { key: "calciumMg", name: "Calcium", unit: "mg", target: "calciumMg", description: "Important for bones and teeth." },
-  { key: "ironMg", name: "Iron", unit: "mg", target: "ironMg", description: "Supports oxygen transport in blood." },
-  { key: "magnesiumMg", name: "Magnesium", unit: "mg", target: "magnesiumMg", description: "Involved in many body functions." },
-  { key: "potassiumMg", name: "Potassium", unit: "mg", target: "potassiumMg", description: "Helps nerves and muscles function." },
-  { key: "zincMg", name: "Zinc", unit: "mg", target: "zincMg", description: "Supports normal growth and immune function." },
-  { key: "vitaminCMg", name: "Vitamin C", unit: "mg", target: "vitaminCMg", description: "Helps the body absorb iron from plant foods." },
-  { key: "vitaminDIu", name: "Vitamin D", unit: "IU", target: "vitaminDIu", description: "Supports calcium absorption." },
-  { key: "vitaminB12Mcg", name: "Vitamin B12", unit: "µg", target: "vitaminB12Mcg", description: "Supports nerves and blood cells." },
-  { key: "omega3G", name: "Omega-3", unit: "g", target: "omega3G", description: "A family of essential fatty acids." },
-  { key: "sodiumMg", name: "Sodium", unit: "mg", target: null, description: "Intake varies a lot with salt and packaged foods." },
-  { key: "fiberG", name: "Fiber", unit: "g", target: null, description: "Supports regular digestion." },
-  { key: "sugarG", name: "Sugars", unit: "g", target: null, description: "Total sugar estimate across logged foods." }
+  { key: "caloriesKcal", name: "Energy", unit: "kcal", target: "caloriesKcal", category: "Energy & macros", description: "Estimated food energy." },
+  { key: "proteinG", name: "Protein", unit: "g", target: "proteinG", category: "Energy & macros", description: "Protein supports normal tissue maintenance and growth." },
+  { key: "carbsG", name: "Carbohydrates", unit: "g", target: "carbsG", category: "Energy & macros", description: "A major source of energy." },
+  { key: "fatG", name: "Total fat", unit: "g", target: "fatG", category: "Energy & macros", description: "Dietary fat supports energy and normal body functions." },
+  { key: "fiberG", name: "Dietary fibre", unit: "g", target: null, category: "Energy & macros", description: "Estimate when enough food detail is available." },
+  { key: "sugarG", name: "Total sugars", unit: "g", target: null, category: "Energy & macros", description: "Depends on ingredients and preparation." },
+  { key: "omega3G", name: "Omega-3", unit: "g", target: "omega3G", category: "Essential fats", description: "A family of essential fatty acids." },
+  { key: "omega6G", name: "Omega-6", unit: "g", target: "omega6G", category: "Essential fats", description: "A family of essential fatty acids." },
+  { key: "calciumMg", name: "Calcium", unit: "mg", target: "calciumMg", category: "Minerals", description: "Supports bones and teeth." },
+  { key: "phosphorusMg", name: "Phosphorus", unit: "mg", target: "phosphorusMg", category: "Minerals", description: "A mineral found in bones and many foods." },
+  { key: "magnesiumMg", name: "Magnesium", unit: "mg", target: "magnesiumMg", category: "Minerals", description: "Involved in many body functions." },
+  { key: "potassiumMg", name: "Potassium", unit: "mg", target: "potassiumMg", category: "Minerals", description: "Helps nerves and muscles function." },
+  { key: "sodiumMg", name: "Sodium", unit: "mg", target: "sodiumMg", category: "Minerals", description: "Varies with salt and packaged foods." },
+  { key: "chlorideMg", name: "Chloride", unit: "mg", target: "chlorideMg", category: "Minerals", description: "The 2.3 g reference target is represented as 2300 mg." },
+  { key: "zincMg", name: "Zinc", unit: "mg", target: "zincMg", category: "Minerals", description: "Supports normal immune function." },
+  { key: "ironMg", name: "Iron", unit: "mg", target: "ironMg", category: "Minerals", description: "Supports oxygen transport in blood." },
+  { key: "iodineMcg", name: "Iodine", unit: "µg", target: "iodineMcg", category: "Minerals", description: "Food estimates vary; iodized salt content is a key uncertainty." },
+  { key: "copperMcg", name: "Copper", unit: "µg", target: "copperMcg", category: "Minerals", description: "A trace mineral." },
+  { key: "manganeseMg", name: "Manganese", unit: "mg", target: "manganeseMg", category: "Minerals", description: "A trace mineral in many plant foods." },
+  { key: "seleniumMcg", name: "Selenium", unit: "µg", target: "seleniumMcg", category: "Minerals", description: "A trace mineral whose content depends on food and soil." },
+  { key: "fluorideMg", name: "Fluoride", unit: "mg", target: "fluorideMg", category: "Minerals", description: "Often not estimable from a meal photo." },
+  { key: "chromiumMcg", name: "Chromium", unit: "µg", target: "chromiumMcg", category: "Minerals", description: "Trace mineral; food composition data can be limited." },
+  { key: "molybdenumMcg", name: "Molybdenum", unit: "µg", target: "molybdenumMcg", category: "Minerals", description: "Trace mineral; food composition data can be limited." },
+  { key: "vitaminAMcg", name: "Vitamin A", unit: "µg", target: "vitaminAMcg", category: "Vitamins", description: "Estimate may be expressed as activity equivalents." },
+  { key: "vitaminDIu", name: "Vitamin D", unit: "IU", target: "vitaminDIu", category: "Vitamins", description: "Supports calcium absorption; often difficult to estimate from photos." },
+  { key: "vitaminEMg", name: "Vitamin E", unit: "mg", target: "vitaminEMg", category: "Vitamins", description: "A fat-soluble vitamin." },
+  { key: "vitaminKMcg", name: "Vitamin K", unit: "µg", target: "vitaminKMcg", category: "Vitamins", description: "A fat-soluble vitamin." },
+  { key: "vitaminCMg", name: "Vitamin C", unit: "mg", target: "vitaminCMg", category: "Vitamins", description: "Helps the body absorb iron from plant foods." },
+  { key: "vitaminB1Mg", name: "Vitamin B1 (Thiamine)", unit: "mg", target: "vitaminB1Mg", category: "Vitamins", description: "A B vitamin involved in energy metabolism." },
+  { key: "vitaminB2Mg", name: "Vitamin B2 (Riboflavin)", unit: "mg", target: "vitaminB2Mg", category: "Vitamins", description: "A B vitamin involved in energy metabolism." },
+  { key: "vitaminB3Mg", name: "Vitamin B3 (Niacin)", unit: "mg", target: "vitaminB3Mg", category: "Vitamins", description: "A B vitamin involved in energy metabolism." },
+  { key: "vitaminB5Mg", name: "Vitamin B5 (Pantothenic acid)", unit: "mg", target: "vitaminB5Mg", category: "Vitamins", description: "A B vitamin involved in metabolism." },
+  { key: "vitaminB6Mg", name: "Vitamin B6", unit: "mg", target: "vitaminB6Mg", category: "Vitamins", description: "A B vitamin involved in protein metabolism." },
+  { key: "vitaminB7Mcg", name: "Vitamin B7 (Biotin)", unit: "µg", target: "vitaminB7Mcg", category: "Vitamins", description: "A B vitamin." },
+  { key: "folateMcg", name: "Vitamin B9 (Folate)", unit: "µg", target: "folateMcg", category: "Vitamins", description: "Folate content varies by food and preparation." },
+  { key: "vitaminB12Mcg", name: "Vitamin B12", unit: "µg", target: "vitaminB12Mcg", category: "Vitamins", description: "Supports normal nerve and blood cell function." }
 ];
 const MACROS = [
   { key: "caloriesKcal", label: "Energy", unit: "kcal", target: "caloriesKcal", css: "" },
@@ -29,15 +56,14 @@ const MACROS = [
   { key: "carbsG", label: "Carbohydrates", unit: "g", target: "carbsG", css: "fill-carbs" },
   { key: "fatG", label: "Fat", unit: "g", target: "fatG", css: "fill-fat" }
 ];
-const FIELD_IDS = [
-  "caloriesKcal", "proteinG", "carbsG", "fatG", "fiberG", "sugarG", "sodiumMg",
-  "calciumMg", "ironMg", "magnesiumMg", "potassiumMg", "zincMg", "vitaminCMg",
-  "vitaminDIu", "vitaminB12Mcg", "omega3G"
-];
+const FIELD_IDS = NUTRIENTS.map(function (nutrient) { return nutrient.key; });
 let state = loadState();
 let selectedPhoto = null;
 let pendingAnalysis = null;
 let toastTimer = null;
+let autoAnalyzeTimer = null;
+let lastAttemptedSignature = "";
+let analysisInProgress = false;
 
 function loadState() {
   try {
@@ -252,28 +278,32 @@ function renderHistory() {
   }).join("");
 }
 
+function renderTargetFields() {
+  const host = document.getElementById("target-fields");
+  if (!host) return;
+  const groups = ["Energy & macros", "Essential fats", "Minerals", "Vitamins"];
+  host.innerHTML = groups.map(function (group) {
+    const fields = NUTRIENTS.filter(function (n) { return n.target && n.category === group; });
+    if (!fields.length) return "";
+    return '<section class="target-group"><h3>' + escapeHtml(group) + '</h3><div class="settings-grid">' +
+      fields.map(function (n) {
+        return '<div><label for="target-' + escapeHtml(n.key) + '">' + escapeHtml(n.name) + ' (' + escapeHtml(n.unit) + ')</label>' +
+          '<input id="target-' + escapeHtml(n.key) + '" type="number" min="0.1" max="10000000" step="any" required value="' +
+          escapeHtml(state.targets[n.key]) + '"></div>';
+      }).join("") + '</div></section>';
+  }).join("");
+}
+
 function renderSettings() {
-  safeNumberInput("target-calories", state.targets.caloriesKcal);
-  safeNumberInput("target-protein", state.targets.proteinG);
-  safeNumberInput("target-carbs", state.targets.carbsG);
-  safeNumberInput("target-fat", state.targets.fatG);
-  safeNumberInput("target-calcium", state.targets.calciumMg);
-  safeNumberInput("target-iron", state.targets.ironMg);
-  safeNumberInput("target-magnesium", state.targets.magnesiumMg);
-  safeNumberInput("target-potassium", state.targets.potassiumMg);
-  safeNumberInput("target-zinc", state.targets.zincMg);
-  safeNumberInput("target-vitaminC", state.targets.vitaminCMg);
-  safeNumberInput("target-vitaminD", state.targets.vitaminDIu);
-  safeNumberInput("target-b12", state.targets.vitaminB12Mcg);
-  safeNumberInput("target-omega3", state.targets.omega3G);
+  renderTargetFields();
   updateEnergyNote();
 }
 
 function updateEnergyNote() {
-  const p = Number(document.getElementById("target-protein").value);
-  const c = Number(document.getElementById("target-carbs").value);
-  const f = Number(document.getElementById("target-fat").value);
-  const kcal = Number(document.getElementById("target-calories").value);
+  const p = Number(document.getElementById("target-proteinG")?.value);
+  const c = Number(document.getElementById("target-carbsG")?.value);
+  const f = Number(document.getElementById("target-fatG")?.value);
+  const kcal = Number(document.getElementById("target-caloriesKcal")?.value);
   const note = document.getElementById("target-energy-note");
   if (![p, c, f, kcal].every(Number.isFinite) || p < 0 || c < 0 || f < 0 || kcal <= 0) {
     note.hidden = true;
@@ -289,7 +319,20 @@ function updateEnergyNote() {
   }
 }
 
+function renderReviewFields() {
+  const host = document.getElementById("review-nutrient-grid");
+  if (!host) return;
+  const required = new Set(["caloriesKcal", "proteinG", "carbsG", "fatG"]);
+  host.innerHTML = NUTRIENTS.map(function (nutrient) {
+    return '<div class="nutrient-input"><label for="field-' + escapeHtml(nutrient.key) + '">' +
+      escapeHtml(nutrient.name) + ' <small>' + escapeHtml(nutrient.unit) + '</small></label>' +
+      '<input id="field-' + escapeHtml(nutrient.key) + '" type="number" min="0" max="10000000" step="any"' +
+      (required.has(nutrient.key) ? ' required' : '') + '></div>';
+  }).join("");
+}
+
 function fillReview(result) {
+  renderReviewFields();
   pendingAnalysis = result;
   const nutrition = result.nutrition || {};
   document.getElementById("review-food-name").value = result.foodName || "";
@@ -329,16 +372,46 @@ function setAnalyzing(active) {
   button.innerHTML = active ? '<span class="spinner" aria-hidden="true"></span> Asking Gemini…' : '<span>✳</span> Analyze with Gemini <span class="button-arrow">→</span>';
 }
 
-async function analyzeMeal(event) {
-  event.preventDefault();
-  setFormError("");
-  clearReview();
+function currentAnalysisSignature() {
   const description = document.getElementById("food-description").value.trim();
+  const photo = selectedPhoto ? [selectedPhoto.name, selectedPhoto.size, selectedPhoto.lastModified, selectedPhoto.type].join(":") : "";
+  return description + "|" + photo;
+}
+
+function scheduleAutoAnalysis(delay) {
+  window.clearTimeout(autoAnalyzeTimer);
+  const signature = currentAnalysisSignature();
+  const description = document.getElementById("food-description").value.trim();
+  if (!description && !selectedPhoto) return;
+  if (signature === lastAttemptedSignature) return;
+  autoAnalyzeTimer = window.setTimeout(function () {
+    if (currentAnalysisSignature() !== signature) {
+      scheduleAutoAnalysis(700);
+      return;
+    }
+    if (analysisInProgress) {
+      scheduleAutoAnalysis(700);
+      return;
+    }
+    analyzeMeal(null, { automatic: true });
+  }, Number.isFinite(delay) ? delay : 1800);
+}
+
+async function analyzeMeal(event, options) {
+  if (event && typeof event.preventDefault === "function") event.preventDefault();
+  if (analysisInProgress) return;
+  setFormError("");
+  const description = document.getElementById("food-description").value.trim();
+  const signature = currentAnalysisSignature();
   if (!description && !selectedPhoto) {
     setFormError("Describe the food or select a photo before analyzing.");
     return;
   }
+  if (options && options.automatic && signature === lastAttemptedSignature) return;
+  lastAttemptedSignature = signature;
+  analysisInProgress = true;
   setAnalyzing(true);
+  clearReview();
   try {
     const body = { description: description };
     if (selectedPhoto) {
@@ -359,11 +432,16 @@ async function analyzeMeal(event) {
       return;
     }
     if (!response.ok) throw new Error(result.error || "Analysis failed. Please try again.");
+    if (currentAnalysisSignature() !== signature) return;
     fillReview(result);
   } catch (err) {
-    setFormError(err.message || "Could not analyze the meal.");
+    if (currentAnalysisSignature() === signature) {
+      setFormError(err.message || "Could not analyze the meal.");
+    }
   } finally {
+    analysisInProgress = false;
     setAnalyzing(false);
+    if (currentAnalysisSignature() !== signature) scheduleAutoAnalysis(500);
   }
 }
 
@@ -388,6 +466,7 @@ function setPhoto(file) {
     preview.hidden = true;
     document.getElementById("photo-preview-image").removeAttribute("src");
     document.getElementById("food-photo").value = "";
+    scheduleAutoAnalysis(500);
     return;
   }
   const allowed = ["image/jpeg", "image/png", "image/webp"];
@@ -401,8 +480,22 @@ function setPhoto(file) {
   }
   selectedPhoto = file;
   document.getElementById("photo-file-name").textContent = file.name;
-  document.getElementById("photo-preview-image").src = URL.createObjectURL(file);
   preview.hidden = false;
+  const reader = new FileReader();
+  reader.onload = function () {
+    if (selectedPhoto !== file) return;
+    const dataUrl = String(reader.result || "");
+    if (!dataUrl.startsWith("data:image/")) {
+      showToast("Could not preview that image. Please choose another photo.");
+      return;
+    }
+    document.getElementById("photo-preview-image").src = dataUrl;
+  };
+  reader.onerror = function () {
+    if (selectedPhoto === file) showToast("Could not preview that photo. Try another image.");
+  };
+  reader.readAsDataURL(file);
+  scheduleAutoAnalysis(900);
 }
 
 function saveMeal(event) {
@@ -500,21 +593,16 @@ function downloadFile(content, fileName, type) {
 
 function saveTargets(event) {
   event.preventDefault();
-  const mapping = {
-    caloriesKcal: "target-calories", proteinG: "target-protein", carbsG: "target-carbs", fatG: "target-fat",
-    calciumMg: "target-calcium", ironMg: "target-iron", magnesiumMg: "target-magnesium", potassiumMg: "target-potassium",
-    zincMg: "target-zinc", vitaminCMg: "target-vitaminC", vitaminDIu: "target-vitaminD",
-    vitaminB12Mcg: "target-b12", omega3G: "target-omega3"
-  };
   const next = {};
-  for (const pair of Object.entries(mapping)) {
-    const value = Number(document.getElementById(pair[1]).value);
-    if (!Number.isFinite(value) || value <= 0) {
-      showToast("All targets must be positive numbers.");
-      document.getElementById(pair[1]).focus();
+  for (const key of Object.keys(DEFAULTS.targets)) {
+    const input = document.getElementById("target-" + key);
+    const value = Number(input && input.value);
+    if (!input || !Number.isFinite(value) || value <= 0) {
+      showToast("All daily reference targets must be positive numbers.");
+      input && input.focus();
       return;
     }
-    next[pair[0]] = value;
+    next[key] = value;
   }
   state.targets = next;
   saveState();
@@ -601,11 +689,13 @@ function bindEvents() {
     button.addEventListener("click", function () {
       document.getElementById("food-description").value = button.dataset.example;
       document.getElementById("food-description").focus();
+      scheduleAutoAnalysis(350);
     });
   });
   document.getElementById("targets-form").addEventListener("submit", saveTargets);
-  ["target-calories", "target-protein", "target-carbs", "target-fat"].forEach(function (id) {
-    document.getElementById(id).addEventListener("input", updateEnergyNote);
+  document.getElementById("target-fields").addEventListener("input", updateEnergyNote);
+  document.getElementById("food-description").addEventListener("input", function () {
+    scheduleAutoAnalysis(1800);
   });
   document.getElementById("export-json-button").addEventListener("click", exportJson);
   document.getElementById("export-csv-button").addEventListener("click", exportCsv);
