@@ -89,7 +89,7 @@
                   <div><label for="entry-meal">Meal type</label><select id="entry-meal"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select></div>
                 </div>
                 <button id="analyze-button" class="button button-primary full-width analyze-button" type="submit"><span>✳</span> Analyze with Gemini <span class="button-arrow">→</span></button>
-                <p class="small muted form-helper">The AI fills in an editable estimate. Review the serving and nutrients before saving.</p>
+                <p class="small muted form-helper">After you stop typing or select a photo, Gemini analyzes in the background and fills an editable estimate. Review the serving and nutrients before saving; nothing is saved until you confirm.</p>
                 <p id="analyze-error" class="form-error" role="alert" aria-live="polite"></p>
               </form>
             </section>
@@ -99,24 +99,7 @@
             <div class="panel-heading"><div><p class="eyebrow">CHECK BEFORE SAVING</p><h2>Review your meal</h2><p class="muted small">These values were estimated by AI. Edit anything that looks wrong.</p></div><span id="confidence-pill" class="confidence-pill">Estimate</span></div>
             <form id="save-form">
               <div class="form-grid review-name-grid"><div><label for="review-food-name">Food / meal name</label><input id="review-food-name" maxlength="120" required></div><div><label for="review-serving">Portion / serving</label><input id="review-serving" maxlength="120" required></div></div>
-              <div class="review-nutrient-grid">
-                <div class="nutrient-input"><label for="field-caloriesKcal">Energy <small>kcal</small></label><input id="field-caloriesKcal" type="number" min="0" max="100000" step="1" required></div>
-                <div class="nutrient-input"><label for="field-proteinG">Protein <small>g</small></label><input id="field-proteinG" type="number" min="0" max="10000" step="0.1" required></div>
-                <div class="nutrient-input"><label for="field-carbsG">Carbs <small>g</small></label><input id="field-carbsG" type="number" min="0" max="10000" step="0.1" required></div>
-                <div class="nutrient-input"><label for="field-fatG">Fat <small>g</small></label><input id="field-fatG" type="number" min="0" max="10000" step="0.1" required></div>
-                <div class="nutrient-input"><label for="field-fiberG">Fiber <small>g</small></label><input id="field-fiberG" type="number" min="0" max="10000" step="0.1"></div>
-                <div class="nutrient-input"><label for="field-sugarG">Sugars <small>g</small></label><input id="field-sugarG" type="number" min="0" max="10000" step="0.1"></div>
-                <div class="nutrient-input"><label for="field-sodiumMg">Sodium <small>mg</small></label><input id="field-sodiumMg" type="number" min="0" max="100000" step="1"></div>
-                <div class="nutrient-input"><label for="field-calciumMg">Calcium <small>mg</small></label><input id="field-calciumMg" type="number" min="0" max="100000" step="1"></div>
-                <div class="nutrient-input"><label for="field-ironMg">Iron <small>mg</small></label><input id="field-ironMg" type="number" min="0" max="10000" step="0.1"></div>
-                <div class="nutrient-input"><label for="field-magnesiumMg">Magnesium <small>mg</small></label><input id="field-magnesiumMg" type="number" min="0" max="100000" step="1"></div>
-                <div class="nutrient-input"><label for="field-potassiumMg">Potassium <small>mg</small></label><input id="field-potassiumMg" type="number" min="0" max="100000" step="1"></div>
-                <div class="nutrient-input"><label for="field-zincMg">Zinc <small>mg</small></label><input id="field-zincMg" type="number" min="0" max="10000" step="0.1"></div>
-                <div class="nutrient-input"><label for="field-vitaminCMg">Vitamin C <small>mg</small></label><input id="field-vitaminCMg" type="number" min="0" max="100000" step="0.1"></div>
-                <div class="nutrient-input"><label for="field-vitaminDIu">Vitamin D <small>IU</small></label><input id="field-vitaminDIu" type="number" min="0" max="100000" step="1"></div>
-                <div class="nutrient-input"><label for="field-vitaminB12Mcg">Vitamin B12 <small>µg</small></label><input id="field-vitaminB12Mcg" type="number" min="0" max="100000" step="0.1"></div>
-                <div class="nutrient-input"><label for="field-omega3G">Omega-3 <small>g</small></label><input id="field-omega3G" type="number" min="0" max="10000" step="0.1"></div>
-              </div>
+              <div id="review-nutrient-grid" class="review-nutrient-grid"></div>
               <div class="ai-notes"><span>✳</span><div><strong>AI estimate notes</strong><p id="review-notes">Review the ingredients and serving size before saving.</p><p id="review-assumptions" class="small muted"></p></div></div>
               <div class="review-actions"><button id="discard-review" class="button button-ghost" type="button">Discard</button><button id="save-meal-button" class="button button-primary" type="submit">Save meal to my log <span>→</span></button></div>
             </form>
@@ -124,11 +107,11 @@
         </section>
 
         <section class="view" id="view-nutrients" aria-labelledby="nutrients-heading">
-          <div class="page-heading"><p class="eyebrow">BEYOND THE MACROS</p><h1 id="nutrients-heading">Nutrient analysis</h1><p class="muted">A view of selected micronutrients from foods recorded for the chosen day.</p></div>
+          <div class="page-heading"><p class="eyebrow">BEYOND THE MACROS</p><h1 id="nutrients-heading">Nutrient analysis</h1><p class="muted">A view of estimated nutrients from foods recorded for the chosen day.</p></div>
           <div class="date-control nutrient-date"><span class="date-icon">▦</span><input id="nutrients-date" aria-label="Nutrient analysis date" type="date"></div>
           <div class="panel nutrient-explainer"><div class="explainer-icon">✳</div><div><h2>What can we estimate?</h2><p class="muted">Gemini may estimate calcium, iron, magnesium, potassium, zinc, vitamins C and D, B12, sodium and omega-3 where the food description supports it. Blank means unknown—not zero.</p></div></div>
           <div id="micronutrient-grid" class="micro-grid"></div>
-          <p class="disclaimer">Micronutrients are often harder to estimate than calories and macros. This screen only totals values returned for logged meals; it does not imply an unreported nutrient is absent.</p>
+          <p class="disclaimer">Micronutrients are often harder to estimate than calories and macros. This screen only totals values returned for logged meals. Sulfur is not separately estimated; protein-containing foods are a qualitative proxy. An unreported nutrient is unknown, not zero.</p>
         </section>
 
         <section class="view" id="view-history" aria-labelledby="history-heading">
@@ -141,23 +124,8 @@
           <div class="settings-layout">
             <section class="panel"><div class="panel-heading"><div><h2>Daily reference targets</h2><p class="muted small">Edit these to suit your own guidance.</p></div></div>
               <form id="targets-form" class="settings-form">
-                <div class="setting-group"><h3>Energy & macros</h3><div class="settings-grid">
-                  <div><label for="target-calories">Energy (kcal)</label><input id="target-calories" type="number" min="1" max="10000" required></div>
-                  <div><label for="target-protein">Protein (g)</label><input id="target-protein" type="number" min="1" max="1000" step="0.1" required></div>
-                  <div><label for="target-carbs">Carbohydrates (g)</label><input id="target-carbs" type="number" min="1" max="2000" step="0.1" required></div>
-                  <div><label for="target-fat">Fat (g)</label><input id="target-fat" type="number" min="1" max="1000" step="0.1" required></div>
-                </div></div>
-                <div class="setting-group"><h3>Selected micronutrients</h3><p class="muted small">These are editable reference values, not personalized medical recommendations.</p><div class="settings-grid">
-                  <div><label for="target-calcium">Calcium (mg)</label><input id="target-calcium" type="number" min="1" max="10000" required></div>
-                  <div><label for="target-iron">Iron (mg)</label><input id="target-iron" type="number" min="1" max="1000" required></div>
-                  <div><label for="target-magnesium">Magnesium (mg)</label><input id="target-magnesium" type="number" min="1" max="10000" required></div>
-                  <div><label for="target-potassium">Potassium (mg)</label><input id="target-potassium" type="number" min="1" max="20000" required></div>
-                  <div><label for="target-zinc">Zinc (mg)</label><input id="target-zinc" type="number" min="1" max="1000" required></div>
-                  <div><label for="target-vitaminC">Vitamin C (mg)</label><input id="target-vitaminC" type="number" min="1" max="10000" required></div>
-                  <div><label for="target-vitaminD">Vitamin D (IU)</label><input id="target-vitaminD" type="number" min="1" max="10000" required></div>
-                  <div><label for="target-b12">Vitamin B12 (µg)</label><input id="target-b12" type="number" min="0.1" max="10000" step="0.1" required></div>
-                  <div><label for="target-omega3">Omega-3 (g)</label><input id="target-omega3" type="number" min="0.1" max="1000" step="0.1" required></div>
-                </div></div>
+                <p class="muted small">Reference values are editable. Unknown food nutrients remain blank instead of being silently recorded as zero.</p>
+                <div id="target-fields"></div>
                 <div id="target-energy-note" class="inline-notice" hidden></div>
                 <button class="button button-primary" type="submit">Save targets</button><p id="target-save-status" class="form-success" aria-live="polite"></p>
               </form>
