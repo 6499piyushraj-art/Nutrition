@@ -35,7 +35,8 @@ test("Render config names the production secrets without committing values", asy
 test("unknown micronutrients remain absent instead of being silently zeroed", async () => {
   const server = await read("server.js");
   const client = await read("public/app.js");
+  const page = await read("public/index.html");
   assert.match(server, /omit a field if a reasonable estimate is not available/);
   assert.match(client, /Not estimated/);
-  assert.match(client, /values returned for logged meals/);
+  assert.match(page, /values returned for logged meals/);
 });
