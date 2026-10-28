@@ -32,6 +32,39 @@ test("Render config names the production secrets without committing values", asy
   assert.match(config, /key: SESSION_SECRET\s+generateValue: true/);
 });
 
+test("all requested macro, mineral and vitamin keys are covered in API and UI", async () => {
+  const server = await read("server.js");
+  const client = await read("public/app.js");
+  const required = [
+    "omega6G", "phosphorusMg", "chlorideMg", "iodineMcg", "copperMcg", "manganeseMg",
+    "seleniumMcg", "fluorideMg", "chromiumMcg", "molybdenumMcg", "vitaminAMcg", "vitaminEMg",
+    "vitaminKMcg", "vitaminB1Mg", "vitaminB2Mg", "vitaminB3Mg", "vitaminB5Mg", "vitaminB6Mg",
+    "vitaminB7Mcg", "folateMcg"
+  ];
+  for (const key of required) {
+    assert.ok(server.includes(key), "server missing " + key);
+    assert.ok(client.includes(key), "client missing " + key);
+  }
+  assert.match(client, /id="target-fields"/);
+});
+
+test("transient Gemini outages are retried and use backup models", async () => {
+  const server = await read("server.js");
+  assert.match(server, /function generateWithFallback/);
+  assert.match(server, /gemini-3\.8-flash/);
+  assert.match(server, /gemini-3\.5-flash-lite/);
+  assert.match(server, /Gemini is temporarily busy/);
+});
+
+test("meal input and photo selection can trigger background analysis without auto-saving", async () => {
+  const client = await read("public/app.js");
+  const page = await read("public/index.html");
+  assert.match(client, /function scheduleAutoAnalysis/);
+  assert.match(client, /scheduleAutoAnalysis\(1800\)/);
+  assert.match(client, /reader\.readAsDataURL\(file\)/);
+  assert.match(page, /nothing is saved until you confirm/i);
+});
+
 test("unknown micronutrients remain absent instead of being silently zeroed", async () => {
   const server = await read("server.js");
   const client = await read("public/app.js");
