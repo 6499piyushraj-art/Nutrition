@@ -1,0 +1,21 @@
+{
+  "name": "mynutri-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Private AI-assisted nutrition tracker with server-side Gemini analysis.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@google/genai": "2.31.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "helmet": "^8.1.0"
+  }
+}
