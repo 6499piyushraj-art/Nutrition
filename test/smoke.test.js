@@ -45,7 +45,7 @@ test("all requested macro, mineral and vitamin keys are covered in API and UI", 
     assert.ok(server.includes(key), "server missing " + key);
     assert.ok(client.includes(key), "client missing " + key);
   }
-  assert.match(client, /id="target-fields"/);
+  assert.match(await read("public/index.html"), /id="target-fields"/);
 });
 
 test("transient Gemini outages are retried and use backup models", async () => {
