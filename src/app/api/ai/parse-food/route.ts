@@ -6,14 +6,19 @@ import { checkRateLimit } from '@/lib/rate-limit';
 const AI_DAILY_LIMIT = 50;
 const AI_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-const SYSTEM_PROMPT = `You are a nutrition data extraction assistant. Extract structured food nutrition information from user input (text or images).
+const SYSTEM_PROMPT = `You are a nutrition data extraction assistant for a food diary.
+The user may write in Hindi, Hinglish, or English, and may list one food or several foods with portions in one message.
+Understand Indian foods and household measures such as roti, katori, glass, cup, spoon, poha, dal, sabzi, paratha, idli, dosa, and chai.
+If multiple foods are listed, treat the input as one complete food log: estimate each listed portion and ADD their nutrients together. Return one combined entry and totals for the entire message, not only the first food.
+Use the quantities and serving sizes the user wrote. If a quantity is not stated, use a common realistic portion and clearly reflect the portion in the description.
+Preserve the food names and language from the user's message in the description so they can recognise what they logged.
 
 Return ONLY valid JSON with these fields:
 {
-  "description": "Food name (e.g. Hard-Boiled Egg, Subway Italian BMT 6-inch)",
+  "description": "Concise description of all foods and quantities in this log, preserving the user's wording",
   "brand_name": "Brand if applicable, null otherwise",
   "default_serving_size": number or null,
-  "default_serving_unit": "g, oz, cup, piece, sandwich, bowl, etc.",
+  "default_serving_unit": "g, ml, cup, piece, bowl, katori, meal, etc.",
   "energy_kcal": number or null,
   "protein_g": number or null,
   "fat_g": number (total fat) or null,
@@ -26,12 +31,12 @@ Return ONLY valid JSON with these fields:
 }
 
 Rules:
-- Use the most common/standard values when ranges are given (e.g. 72-78 kcal → use 78)
-- For photos of food, estimate reasonable portions and nutrition
-- For nutrition labels, read exact values
-- Do NOT include tags — the user manages tags manually
-- If a value cannot be determined, use null
-- Return ONLY the JSON object, no markdown fences, no explanation`;
+- These values are estimates for the TOTAL amount in the complete log; combine all listed foods and quantities.
+- For homemade food, use typical cooked Indian food values and reasonable portions. Do not treat a katori or roti as 1 gram.
+- For nutrition labels, use exact values from the label.
+- If a nutrient genuinely cannot be estimated, use null; never invent precision.
+- Do NOT include tags; the user manages tags manually.
+- Return ONLY the JSON object, no markdown fences and no explanation.`;
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -59,7 +64,7 @@ export async function POST(request: Request) {
     if (type === 'text') {
       const provider = getProvider('text');
       rawResponse = await provider.parseText(
-        `Extract nutrition information from this text:\n\n${content}`,
+        'This is the complete food-log input. Understand Hindi, Hinglish, or English and estimate combined nutrition for every food and portion listed below. Input:\n\n' + content,
         SYSTEM_PROMPT,
       );
     } else if (type === 'image') {
