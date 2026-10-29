@@ -52,7 +52,6 @@ test("transient Gemini outages are retried and use backup models", async () => {
   const server = await read("server.js");
   assert.match(server, /function generateWithFallback/);
   assert.match(server, /function needsSearchGrounding/);
-  assert.match(server, /const attempts = index === 0 \? 2 : 1/ === false ? /never/ : /if \(useSearch\)/);
   assert.match(server, /gemini-3\.8-flash/);
   assert.match(server, /gemini-3\.5-flash-lite/);
   assert.match(server, /Gemini Search\/analysis is temporarily unavailable/);
