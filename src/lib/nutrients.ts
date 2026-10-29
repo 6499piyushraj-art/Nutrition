@@ -1,4 +1,4 @@
-export type NutrientGroup = 'macro' | 'essential' | 'other' | 'salt';
+export type NutrientGroup = 'macro' | 'essential';
 export type NutrientConfidence = 'database' | 'estimated' | 'mixed' | 'user-entered' | 'unknown';
 export type NutrientStatus = 'complete' | 'partial' | 'unavailable' | 'no_food';
 
@@ -18,22 +18,6 @@ export const NUTRIENT_SPECS = [
   { key: 'vitamin_c', label: 'Vitamin C', unit: 'mg', group: 'essential', defaultTarget: 75 },
   { key: 'vitamin_a', label: 'Vitamin A', unit: 'µg', group: 'essential', defaultTarget: 900, targetHint: 'Database values may use retinol activity equivalents (RAE).' },
   { key: 'iodine', label: 'Iodine', unit: 'µg', group: 'essential', defaultTarget: 150 },
-  { key: 'phosphorus', label: 'Phosphorus', unit: 'mg', group: 'other', defaultTarget: 1250 },
-  { key: 'magnesium', label: 'Magnesium', unit: 'mg', group: 'other', defaultTarget: 410 },
-  { key: 'potassium', label: 'Potassium', unit: 'mg', group: 'other', defaultTarget: 3000 },
-  { key: 'copper', label: 'Copper', unit: 'µg', group: 'other', defaultTarget: 890 },
-  { key: 'manganese', label: 'Manganese', unit: 'mg', group: 'other', defaultTarget: 2.2 },
-  { key: 'selenium', label: 'Selenium', unit: 'µg', group: 'other', defaultTarget: 55 },
-  { key: 'vitamin_e', label: 'Vitamin E', unit: 'mg', group: 'other', defaultTarget: 15 },
-  { key: 'vitamin_k', label: 'Vitamin K', unit: 'µg', group: 'other', defaultTarget: 75 },
-  { key: 'b1', label: 'Vitamin B1', unit: 'mg', group: 'other', defaultTarget: 1.2 },
-  { key: 'b2', label: 'Vitamin B2', unit: 'mg', group: 'other', defaultTarget: 1.3 },
-  { key: 'b3', label: 'Vitamin B3', unit: 'mg', group: 'other', defaultTarget: 16 },
-  { key: 'b5', label: 'Vitamin B5', unit: 'mg', group: 'other', defaultTarget: 5 },
-  { key: 'b6', label: 'Vitamin B6', unit: 'mg', group: 'other', defaultTarget: 1.3 },
-  { key: 'biotin', label: 'Biotin (B7)', unit: 'µg', group: 'other', defaultTarget: 30 },
-  { key: 'omega6', label: 'Omega-6', unit: 'g', group: 'other', defaultTarget: 16 },
-  { key: 'sodium', label: 'Sodium', unit: 'mg', group: 'salt', defaultTarget: 2300, targetHint: 'Reference limit: it is not a minimum to reach.', isLimit: true },
 ] as const;
 
 export type NutrientKey = (typeof NUTRIENT_SPECS)[number]['key'];

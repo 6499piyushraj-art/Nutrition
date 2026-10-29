@@ -18,6 +18,8 @@ interface ParsedFood {
   sugar_g: number | null;
   sodium_mg: number | null;
   cholesterol_mg: number | null;
+  nutrient_values?: Record<string, number | null> | null;
+  nutrient_source?: string | null;
 }
 
 function localDate() {
@@ -27,6 +29,10 @@ function localDate() {
 
 function nutritionValue(value: number | null, unit: string) {
   return value === null || value === undefined ? '—' : String(Math.round(value * 10) / 10) + unit;
+}
+
+function nutrientValue(value: number | null | undefined, unit: string) {
+  return typeof value === 'number' && Number.isFinite(value) ? nutritionValue(value, ' ' + unit) : 'Data unavailable';
 }
 
 function AddFoodForm() {
@@ -94,6 +100,8 @@ function AddFoodForm() {
             sodium_mg: parsedFood.sodium_mg,
             saturated_fat_g: parsedFood.saturated_fat_g,
             cholesterol_mg: parsedFood.cholesterol_mg,
+            nutrient_values: parsedFood.nutrient_values || null,
+            nutrient_source: parsedFood.nutrient_source || null,
           },
         }),
       });
@@ -171,39 +179,49 @@ function AddFoodForm() {
             <p className="mt-1 text-xs text-gray-500">AI estimates hain. Save karne se pehle quantity/values check kar lo.</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-px bg-gray-100">
-            <div className="bg-white p-4">
-              <p className="text-xs text-gray-500">Calories</p>
-              <p className="text-2xl font-bold text-orange-600">{nutritionValue(parsedFood.energy_kcal, ' kcal')}</p>
-            </div>
-            <div className="bg-white p-4">
-              <p className="text-xs text-gray-500">Protein</p>
-              <p className="text-xl font-bold text-blue-600">{nutritionValue(parsedFood.protein_g, ' g')}</p>
-            </div>
-            <div className="bg-white p-4">
-              <p className="text-xs text-gray-500">Carbohydrates</p>
-              <p className="text-xl font-bold text-green-600">{nutritionValue(parsedFood.carbs_g, ' g')}</p>
-            </div>
-            <div className="bg-white p-4">
-              <p className="text-xs text-gray-500">Fat</p>
-              <p className="text-xl font-bold text-purple-600">{nutritionValue(parsedFood.fat_g, ' g')}</p>
-            </div>
-            <div className="bg-white p-4">
-              <p className="text-xs text-gray-500">Fiber</p>
-              <p className="text-base font-semibold text-gray-800">{nutritionValue(parsedFood.fiber_g, ' g')}</p>
-            </div>
-            <div className="bg-white p-4">
-              <p className="text-xs text-gray-500">Sugar</p>
-              <p className="text-base font-semibold text-gray-800">{nutritionValue(parsedFood.sugar_g, ' g')}</p>
-            </div>
-            <div className="bg-white p-4">
-              <p className="text-xs text-gray-500">Sodium</p>
-              <p className="text-base font-semibold text-gray-800">{nutritionValue(parsedFood.sodium_mg, ' mg')}</p>
-            </div>
-            <div className="bg-white p-4">
-              <p className="text-xs text-gray-500">Serving</p>
-              <p className="text-base font-semibold text-gray-800">{parsedFood.default_serving_size || 1} {parsedFood.default_serving_unit || 'log'}</p>
-            </div>
+          <div className="space-y-5 p-4">
+            <section>
+              <h3 className="mb-3 font-semibold text-gray-800">Energy & Macronutrients</h3>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {[
+                  { label: 'Calories', value: nutritionValue(parsedFood.energy_kcal, ' kcal') },
+                  { label: 'Protein', value: nutritionValue(parsedFood.protein_g, ' g') },
+                  { label: 'Carbohydrates', value: nutritionValue(parsedFood.carbs_g, ' g') },
+                  { label: 'Total fat', value: nutritionValue(parsedFood.fat_g, ' g') },
+                  { label: 'Omega-3', value: nutrientValue(parsedFood.nutrient_values?.omega3, 'g') },
+                  { label: 'Dietary fiber', value: nutritionValue(parsedFood.fiber_g, ' g') },
+                ].map((item) => (
+                  <div key={item.label} className="min-w-0 rounded-xl border border-gray-100 p-3">
+                    <p className="text-xs text-gray-500">{item.label}</p>
+                    <p className="mt-1 break-words text-base font-bold text-gray-900">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+            <section>
+              <h3 className="mb-1 font-semibold text-gray-800">Essential Micronutrients</h3>
+              <p className="mb-3 text-xs text-gray-500">Micronutrients are shown when they are present in the nutrition label/data you supplied. Missing values stay unavailable; AI does not guess them.</p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {[
+                  { key: 'calcium', label: 'Calcium', unit: 'mg' },
+                  { key: 'iron', label: 'Iron', unit: 'mg' },
+                  { key: 'zinc', label: 'Zinc', unit: 'mg' },
+                  { key: 'vitamin_d', label: 'Vitamin D', unit: 'µg' },
+                  { key: 'b12', label: 'Vitamin B12', unit: 'µg' },
+                  { key: 'folate', label: 'Folate (B9)', unit: 'µg' },
+                  { key: 'vitamin_c', label: 'Vitamin C', unit: 'mg' },
+                  { key: 'vitamin_a', label: 'Vitamin A', unit: 'µg' },
+                  { key: 'iodine', label: 'Iodine', unit: 'µg' },
+                ].map((item) => (
+                  <div key={item.key} className="min-w-0 rounded-xl border border-gray-100 p-3">
+                    <p className="text-xs text-gray-500">{item.label}</p>
+                    <p className="mt-1 break-words text-base font-bold text-gray-900">{nutrientValue(parsedFood.nutrient_values?.[item.key], item.unit)}</p>
+                  </div>
+                ))}
+              </div>
+              {parsedFood.nutrient_source && <p className="mt-2 text-[11px] text-gray-400">Source: {parsedFood.nutrient_source}</p>}
+            </section>
+            <p className="text-xs text-gray-500">Serving represented by this log: {parsedFood.default_serving_size || 1} {parsedFood.default_serving_unit || 'log'}</p>
           </div>
 
           <div className="space-y-2 p-4">

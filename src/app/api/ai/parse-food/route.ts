@@ -27,14 +27,30 @@ Return ONLY valid JSON with these fields:
   "fiber_g": number or null,
   "sugar_g": number or null,
   "sodium_mg": number or null,
-  "cholesterol_mg": number or null
+  "cholesterol_mg": number or null,
+  "nutrient_values": {
+    "omega3": number or null,
+    "calcium": number or null,
+    "iron": number or null,
+    "zinc": number or null,
+    "vitamin_d": number or null,
+    "b12": number or null,
+    "folate": number or null,
+    "vitamin_c": number or null,
+    "vitamin_a": number or null,
+    "iodine": number or null
+  },
+  "nutrient_source": "user-provided nutrition label/data" or null
 }
 
 Rules:
 - These values are estimates for the TOTAL amount in the complete log; combine all listed foods and quantities.
 - For homemade food, use typical cooked Indian food values and reasonable portions. Do not treat a katori or roti as 1 gram.
-- For nutrition labels, use exact values from the label.
-- If a nutrient genuinely cannot be estimated, use null; never invent precision.
+- For nutrition labels or nutrition data explicitly supplied in the user's text/image, extract only values that are actually shown. Do not calculate missing micronutrients.
+- The fields in nutrient_values are NOT general AI estimates. Fill them only when the supplied label/table/text explicitly gives their values. For ordinary food descriptions or a food photo without quantified nutrition information, return null for every nutrient_values field.
+- Never use 0 to mean unknown. Keep unavailable values null. Do not infer micronutrients from memory or invent precision.
+- Use these units in nutrient_values: omega3 in g; calcium, iron, zinc and vitamin_c in mg; vitamin_d, b12, folate, vitamin_a and iodine in µg. Preserve a value only when its unit can be read or safely converted from the supplied data.
+- Set nutrient_source to "User-provided nutrition label/data" only when extracting explicitly supplied nutrition information; otherwise return null.
 - Do NOT include tags; the user manages tags manually.
 - Return ONLY the JSON object, no markdown fences and no explanation.`;
 
@@ -89,8 +105,19 @@ export async function POST(request: Request) {
       cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     }
 
-    const food = JSON.parse(cleaned);
-    return NextResponse.json({ food });
+    const rawFood = JSON.parse(cleaned) as Record<string, unknown>;
+    const rawNutrients = rawFood.nutrient_values && typeof rawFood.nutrient_values === 'object' && !Array.isArray(rawFood.nutrient_values)
+      ? rawFood.nutrient_values as Record<string, unknown>
+      : {};
+    const nutrientKeys = ['omega3', 'calcium', 'iron', 'zinc', 'vitamin_d', 'b12', 'folate', 'vitamin_c', 'vitamin_a', 'iodine'];
+    const nutrientValues = Object.fromEntries(nutrientKeys.map((key) => {
+      const value = rawNutrients[key];
+      return [key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null];
+    }));
+    const nutrientSource = typeof rawFood.nutrient_source === 'string' && rawFood.nutrient_source.trim()
+      ? rawFood.nutrient_source.trim()
+      : null;
+    return NextResponse.json({ food: { ...rawFood, nutrient_values: nutrientValues, nutrient_source: nutrientSource } });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     if (message.includes('No AI provider')) {

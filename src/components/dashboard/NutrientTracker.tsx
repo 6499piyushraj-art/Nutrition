@@ -84,8 +84,6 @@ export default function NutrientTracker() {
 
   const macroSpecs = NUTRIENT_SPECS.filter((item) => item.group === 'macro');
   const essentialSpecs = NUTRIENT_SPECS.filter((item) => item.group === 'essential');
-  const otherSpecs = NUTRIENT_SPECS.filter((item) => item.group === 'other');
-  const sodiumSpec = NUTRIENT_SPECS.find((item) => item.group === 'salt')!;
 
   return (
     <section className="mt-5 space-y-4">
@@ -110,16 +108,6 @@ export default function NutrientTracker() {
             <p className="mb-3 text-xs text-gray-500">Only known food-composition values are counted. Gemini meal parsing does not invent micronutrient values.</p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{essentialSpecs.map((spec) => card(spec.key as Key))}</div>
           </div>
-          <details className="rounded-2xl bg-white p-4 shadow-sm">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold text-gray-800"><span>Other Nutrients</span><ChevronDown size={18} className="text-gray-400" /></summary>
-            <p className="mb-3 mt-2 text-xs text-gray-500">Secondary tracking, kept collapsed by default. Missing values stay unavailable.</p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{otherSpecs.map((spec) => card(spec.key as Key))}</div>
-          </details>
-          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
-            <h3 className="font-semibold text-gray-800">Salt & Sodium</h3>
-            <div className="mt-3">{card(sodiumSpec.key as Key)}</div>
-            <p className="mt-2 text-xs text-gray-600">Added cooking salt is not counted unless its amount is logged or represented in the food data. Sodium is a reference limit, not a minimum to reach.</p>
-          </div>
           {macroWarning && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-semibold">Calorie consistency check</p>
             <p className="mt-1">Your macro targets provide about {Math.round(macroEnergy).toLocaleString()} kcal (protein × 4 + carbs × 4 + fat × 9), {Math.round(Math.abs(calorieGap)).toLocaleString()} kcal {calorieGap > 0 ? 'below' : 'above'} your {Math.round(draft.calories).toLocaleString()} kcal target. No target was changed automatically.</p>
@@ -130,9 +118,9 @@ export default function NutrientTracker() {
             </summary>
             {editing && <form onSubmit={saveTargets} className="mt-4 space-y-4">
               <p className="text-xs text-gray-500">Edit any target. These general reference values are not medical prescriptions.</p>
-              {(['macro', 'essential', 'other', 'salt'] as const).map((group) => (
+              {(['macro', 'essential'] as const).map((group) => (
                 <div key={group}>
-                  <h4 className="mb-2 text-sm font-semibold text-gray-700">{group === 'macro' ? 'Energy & macros' : group === 'essential' ? 'Essential micronutrients' : group === 'other' ? 'Other nutrients' : 'Salt & sodium reference limit'}</h4>
+                  <h4 className="mb-2 text-sm font-semibold text-gray-700">{group === 'macro' ? 'Energy & macros' : 'Essential micronutrients'}</h4>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {NUTRIENT_SPECS.filter((spec) => spec.group === group).map((spec) => (
                       <label key={spec.key} className="block text-sm text-gray-700">

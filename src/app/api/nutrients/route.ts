@@ -45,7 +45,14 @@ async function readTargets(userId: string) {
     sex: schema.healthProfiles.sex,
   }).from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, userId)).get();
   const row = await db.select().from(schema.nutrientTargets).where(eq(schema.nutrientTargets.userId, userId)).get();
-  return { ...getDefaultNutrientTargets(profile), ...(row?.targets || {}) };
+  const defaults = getDefaultNutrientTargets(profile);
+  const saved = row?.targets && typeof row.targets === 'object' && !Array.isArray(row.targets)
+    ? row.targets as Record<string, unknown>
+    : {};
+  return Object.fromEntries(NUTRIENT_SPECS.map((spec) => {
+    const value = saved[spec.key];
+    return [spec.key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
+  })) as ReturnType<typeof getDefaultNutrientTargets>;
 }
 
 export async function GET(request: Request) {
@@ -118,7 +125,14 @@ export async function POST(request: Request) {
       sex: schema.healthProfiles.sex,
     }).from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();
     const previous = await db.select().from(schema.nutrientTargets).where(eq(schema.nutrientTargets.userId, session.user.id)).get();
-    const targets: Record<string, number> = { ...getDefaultNutrientTargets(profile), ...(previous?.targets || {}) };
+    const defaults = getDefaultNutrientTargets(profile);
+    const saved = previous?.targets && typeof previous.targets === 'object' && !Array.isArray(previous.targets)
+      ? previous.targets as Record<string, unknown>
+      : {};
+    const targets: Record<string, number> = Object.fromEntries(NUTRIENT_SPECS.map((spec) => {
+      const value = saved[spec.key];
+      return [spec.key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
+    }));
     const allowed = new Set(NUTRIENT_SPECS.map((item) => item.key));
     for (const [key, value] of Object.entries(body.targets as Record<string, unknown>)) {
       if (!allowed.has(key as never)) continue;
