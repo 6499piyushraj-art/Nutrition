@@ -87,8 +87,8 @@ function normalizeNutrients(value: unknown): Record<(typeof NUTRIENT_KEYS)[numbe
   const source = value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
-  return Object.fromEntries(NUTRIENT_KEYS.map((key) => [key, finiteNonNegative(source[key])]))
-    as Record<(typeof NUTRIENT_KEYS)[number], number | null>;
+  const normalized = Object.fromEntries(NUTRIENT_KEYS.map((key) => [key, finiteNonNegative(source[key])]));
+  return normalized as Record<(typeof NUTRIENT_KEYS)[number], number | null>;
 }
 
 export async function POST(request: Request) {
