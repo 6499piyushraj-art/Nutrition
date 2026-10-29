@@ -2,40 +2,36 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getProvider } from '@/lib/ai-providers';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { searchUSDA, type StrippedFood } from '@/lib/usda';
-import { getIndianFoodMicronutrientFallback } from '@/lib/indian-food-fallback';
 
 const AI_DAILY_LIMIT = 50;
 const AI_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-const SYSTEM_PROMPT = `You are a nutrition data extraction assistant for a food diary.
-The user may write in Hindi, Hinglish, or English, and may list one food or several foods with portions in one message.
-Understand Indian foods and household measures such as roti, katori, glass, cup, spoon, poha, dal, sabzi, paratha, idli, dosa, and chai.
-If multiple foods are listed, treat the input as one complete food log: estimate each listed portion and ADD their nutrients together. Return one combined entry and totals for the entire message, not only the first food.
-Use the quantities and serving sizes the user wrote. If a quantity is not stated, use a common realistic portion and clearly reflect the portion in the description.
-Preserve the food names and language from the user's message in the description so they can recognise what they logged.
+const NUTRIENT_KEYS = [
+  'omega3', 'calcium', 'iron', 'zinc', 'vitamin_d',
+  'b12', 'folate', 'vitamin_c', 'vitamin_a', 'iodine',
+] as const;
 
-Return ONLY valid JSON with these fields:
+const SYSTEM_PROMPT = \`You are MyNutri AI, a careful nutrition estimator. Use your own Gemini nutrition knowledge to estimate ALL nutrition for the foods the user logs. Do not call or claim to have used USDA, IFCT, Open Food Facts, another database, or another AI provider. Every value in the response must come from Gemini's estimate or from a label/image the user supplied.
+
+The user may write Hindi, Hinglish, or English and may list one or multiple foods with amounts. Understand Indian home foods, e.g. doodh/milk, dahi/curd, roti/chapati, dal, chawal/rice, sabzi, poha, idli, dosa, egg/anda, banana/kela, paneer, nuts and chai. Preserve the user's food wording in the description.
+
+Estimate the total nutrition for the ENTIRE portion described, not per 100 g unless the user logged 100 g. Use realistic food-specific composition knowledge, with reasonable portions for household measures. If the user writes "Milk 100g", estimate values for 100 g milk. For plain cow milk, calcium is roughly around 110-125 mg per 100 g; do not leave milk calcium unavailable merely because no nutrition label was supplied. Do not apply cow-milk values to plant milk, flavoured milk, tea, or milkshake.
+
+Return ONLY valid JSON with exactly these fields:
 {
-  "description": "Concise description of all foods and quantities in this log, preserving the user's wording",
-  "brand_name": "Brand if applicable, null otherwise",
-  "default_serving_size": number or null,
+  "description": "concise description of all foods and quantities in the log",
+  "brand_name": null,
+  "default_serving_size": number,
   "default_serving_unit": "g, ml, cup, piece, bowl, katori, meal, etc.",
   "energy_kcal": number or null,
   "protein_g": number or null,
-  "fat_g": number (total fat) or null,
+  "fat_g": number or null,
   "saturated_fat_g": number or null,
-  "carbs_g": number (total carbohydrates) or null,
+  "carbs_g": number or null,
   "fiber_g": number or null,
   "sugar_g": number or null,
   "sodium_mg": number or null,
   "cholesterol_mg": number or null,
-  "items": [
-    {
-      "name": "concise canonical English food name for matching in a food-composition database",
-      "amount_g": total grams of this food in the entire log, or null if not reasonably known
-    }
-  ],
   "nutrient_values": {
     "omega3": number or null,
     "calcium": number or null,
@@ -48,187 +44,69 @@ Return ONLY valid JSON with these fields:
     "vitamin_a": number or null,
     "iodine": number or null
   },
-  "nutrient_source": "user-provided nutrition label/data" or null
+  "nutrient_source": "Gemini AI estimate"
 }
 
-Rules:
-- These values are estimates for the TOTAL amount in the complete log; combine all listed foods and quantities.
-- For homemade food, use typical cooked Indian food values and reasonable portions. Do not treat a katori or roti as 1 gram.
-- In items, list each distinct food actually included in this log (maximum 8); translate Hindi/Hinglish food names into a simple English database lookup name, while preserving the user's wording in description. Include the total gram amount eaten for that item when it can be reasonably estimated. For liquids, estimate the equivalent grams from the stated volume; never include serving quantities in the item name.
-- The items list is used to look up measured food-composition data. Do not add ingredients the user did not mention. If a multi-food log has uncertain portion sizes, use null rather than inventing an exact weight.
-- For nutrition labels or nutrition data explicitly supplied in the user's text/image, extract only values that are actually shown. Do not calculate missing micronutrients.
-- The fields in nutrient_values are NOT general AI estimates. Fill them only when the supplied label/table/text explicitly gives their values. For ordinary food descriptions or a food photo without quantified nutrition information, return null for every nutrient_values field.
-- Never use 0 to mean unknown. Keep unavailable values null. Do not infer micronutrients from memory or invent precision.
-- Use these units in nutrient_values: omega3 in g; calcium, iron, zinc and vitamin_c in mg; vitamin_d, b12, folate, vitamin_a and iodine in µg. Preserve a value only when its unit can be read or safely converted from the supplied data.
-- Set nutrient_source to "User-provided nutrition label/data" only when extracting explicitly supplied nutrition information; otherwise return null.
-- Do NOT include tags; the user manages tags manually.
-- Return ONLY the JSON object, no markdown fences and no explanation.`;
+Nutrient units are fixed:
+- omega3: grams (g)
+- calcium, iron, zinc, vitamin_c: milligrams (mg)
+- vitamin_d, b12, folate, vitamin_a, iodine: micrograms (µg). Vitamin A should be µg RAE where appropriate; vitamin D must be µg, not IU.
+- Energy: kcal; protein/carbohydrate/fat/fiber: grams; sodium/cholesterol: mg.
 
+Critical nutrient rules:
+- Return numeric estimates for all ten nutrient_values fields for common, identifiable foods, including micronutrients. Do NOT set them all to null just because a nutrition label was not supplied.
+- If a food naturally provides effectively none of a nutrient (e.g. B12 in ordinary unfortified plant foods), use 0 when this is a reasonable nutrition estimate. Use null only if the food or portion genuinely cannot be identified well enough to estimate. Never use null as a generic "label not provided" value.
+- Estimate nutrient values for the total portion the user ate. Convert from per-100-g mental/reference values to the actual amount where necessary.
+- For multiple foods, estimate each listed item and add the amounts together. Do not only estimate the first item.
+- If the food type or amount is ambiguous, choose a clearly reasonable estimate and make the portion description explicit instead of refusing to estimate.
+- If exact nutrition values are visible on a provided nutrition label, prefer those exact label values for the nutrients visible and use Gemini's food-composition estimate for the remaining nutrients. Never pretend an estimated value was read from the label.
+- Keep quantities and units internally consistent. Do not return negative values, strings such as "trace", percent daily values, or units inside numeric fields.
+- Keep the macro estimate and micronutrient estimate consistent with the same food and portion.
+- Do not add foods or ingredients the user did not mention.
+- Return valid JSON only, with no markdown fences, comments, or explanation.\`;
 
-const SELECTED_MICRONUTRIENTS = [
-  'omega3', 'calcium', 'iron', 'zinc', 'vitamin_d',
-  'b12', 'folate', 'vitamin_c', 'vitamin_a', 'iodine',
-] as const;
+const MICRONUTRIENT_COMPLETION_PROMPT = \`You are Gemini powering MyNutri AI. Estimate only from your own food-composition knowledge and the user's supplied food description; do not use or claim an external database. Complete all ten selected nutrient estimates for the ENTIRE described portion. These are the units: omega3 g; calcium, iron, zinc, vitamin_c mg; vitamin_d, b12, folate, vitamin_a, iodine µg. For common identifiable foods, do not leave values null merely because a label is absent; use a reasonable estimate. For plain cow milk, calcium should be approximately 110-125 mg per 100 g. Use 0 when the food reasonably contains effectively none; use null only if genuinely impossible to estimate. Do not invent foods. Return only JSON in this shape: {"nutrient_values":{"omega3":number|null,"calcium":number|null,"iron":number|null,"zinc":number|null,"vitamin_d":number|null,"b12":number|null,"folate":number|null,"vitamin_c":number|null,"vitamin_a":number|null,"iodine":number|null}}.\`;
 
-type FoodComponent = { name: string; amount_g: number | null };
-
-function inputContainsExplicitNutrientData(type: string, content: unknown, context: unknown): boolean {
-  if (type === 'image') {
-    return /nutrition\s*(?:facts|label|table)|food\s*label/i.test(typeof context === 'string' ? context : '');
+function parseJsonObject(text: string): Record<string, unknown> {
+  let cleaned = text.trim();
+  if (cleaned.startsWith('\`\`\`')) {
+    cleaned = cleaned.replace(/^\`\`\`(?:json)?\n?/, '').replace(/\n?\`\`\`$/, '');
   }
-  const text = typeof content === 'string' ? content.toLowerCase() : '';
-  const nutrientNames = '(?:calcium|iron|zinc|vitamin\\s*d|vitamin\\s*b\\s*-?\\s*12|b12|folate|vitamin\\s*c|vitamin\\s*a|iodine)';
-  return new RegExp(nutrientNames + '\\s*[:=]?\\s*\\d', 'i').test(text)
-    || new RegExp('\\d+(?:[.,]\\d+)?\\s*(?:mg|mcg|µg|ug)\\s+(?:of\\s*)?' + nutrientNames, 'i').test(text);
+  const parsed: unknown = JSON.parse(cleaned);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Gemini returned an invalid JSON object.');
+  }
+  return parsed as Record<string, unknown>;
 }
 
 function finiteNonNegative(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-function cleanFoodQuery(value: string): string {
-  return value
-    .replace(/\b\d+(?:[.,]\d+)?\s*(?:kg|kgs|g|gram(?:s)?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?|cups?|glasses?|katoris?|bowls?|pieces?|slices?)\b/gi, ' ')
-    .replace(/\b\d+(?:[.,]\d+)?\s*x\s*/gi, ' ')
-    .replace(/[\(\)\[\]\{\}]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function amountFromServing(size: unknown, unitValue: unknown): number | null {
-  const sizeNumber = finiteNonNegative(size);
-  if (sizeNumber === null || sizeNumber <= 0) return null;
-  const unit = typeof unitValue === 'string' ? unitValue.toLowerCase().trim() : '';
-  if (/^(kg|kilograms?)$/.test(unit)) return sizeNumber * 1000;
-  if (/^(g|gram|grams)$/.test(unit)) return sizeNumber;
-  if (/^(ml|millilit(?:er|re)s?)$/.test(unit)) return sizeNumber;
-  if (/^(l|lit(?:er|re)s?)$/.test(unit)) return sizeNumber * 1000;
-  return null;
-}
-
-function explicitGramsFromText(text: string): number | null {
-  const matches = Array.from(text.matchAll(/(\d+(?:[.,]\d+)?)\s*(kg|kgs|g|grams?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?)\b/gi));
-  if (matches.length !== 1) return null;
-  const amount = Number(matches[0][1].replace(',', '.'));
-  const unit = matches[0][2].toLowerCase();
-  if (!Number.isFinite(amount) || amount <= 0 || amount > 10000) return null;
-  if (/^(kg|kgs)$/.test(unit)) return amount * 1000;
-  if (/^(l|liters?|litres?)$/.test(unit)) return amount * 1000;
-  return amount; // For milk-like liquids, 1 ml is approximately 1 g.
-}
-
-function parseComponents(rawItems: unknown, rawFood: Record<string, unknown>, userText: string): FoodComponent[] {
-  const explicitAmount = explicitGramsFromText(userText);
-  if (Array.isArray(rawItems)) {
-    const parsed = rawItems.slice(0, 8).map((entry) => {
-      if (!entry || typeof entry !== 'object') return null;
-      const row = entry as Record<string, unknown>;
-      const name = typeof row.name === 'string' ? cleanFoodQuery(row.name) : '';
-      const amount = finiteNonNegative(row.amount_g);
-      if (!name || name.length < 2) return null;
-      return { name, amount_g: amount !== null && amount > 0 && amount <= 10000 ? amount : null };
-    }).filter((item): item is FoodComponent => item !== null);
-    if (parsed.length) {
-      if (parsed.length === 1) {
-        parsed[0].amount_g = explicitAmount ?? parsed[0].amount_g
-          ?? amountFromServing(rawFood.default_serving_size, rawFood.default_serving_unit);
-      }
-      return parsed;
-    }
-  }
-
-  // Compatibility fallback for older model outputs: only look up a clearly single-food description.
-  const description = typeof rawFood.description === 'string' ? rawFood.description : '';
-  if (!description || /[,;+]|\b(?:and|with|plus|aur|or)\b/i.test(description)) return [];
-  const name = cleanFoodQuery(description);
-  const amount = explicitAmount ?? amountFromServing(rawFood.default_serving_size, rawFood.default_serving_unit);
-  return name ? [{ name, amount_g: amount }] : [];
-}
-
-function candidateScore(query: string, food: StrippedFood): number {
-  const normalizeTokens = (text: string) => cleanFoodQuery(text.toLowerCase())
-    .replace(/[^a-z0-9 ]/g, ' ')
-    .split(/\s+/)
-    .filter((token) => token.length > 1 && !['and', 'with', 'raw', 'fresh', 'food'].includes(token));
-  const queryTokens = Array.from(new Set(normalizeTokens(query)));
-  const foodTokens = new Set(normalizeTokens(food.description));
-  const matches = queryTokens.filter((token) => foodTokens.has(token)).length;
-  const relevance = queryTokens.length ? matches / queryTokens.length : 0;
-  const coverage = SELECTED_MICRONUTRIENTS.filter((key) => {
-    const value = food.nutrient_values?.[key];
-    return typeof value === 'number' && Number.isFinite(value);
-  }).length;
-  const type = food.data_type.toLowerCase();
-  const typeBonus = type.includes('sr legacy') ? 0.6 : type.includes('foundation') ? 0.5 : type.includes('fndds') ? 0.3 : 0;
-  return relevance * 10 + coverage * 0.25 + typeBonus;
-}
-
-async function lookupFoodMicronutrients(components: FoodComponent[]): Promise<{
-  values: Record<string, number>;
-  sources: string[];
-}> {
-  const totals: Record<string, number> = {};
-  const covered = Object.fromEntries(SELECTED_MICRONUTRIENTS.map((key) => [key, true])) as Record<(typeof SELECTED_MICRONUTRIENTS)[number], boolean>;
-  const sources = new Set<string>();
-
-  if (!components.length || components.length > 8 || components.some((item) => item.amount_g === null || item.amount_g <= 0)) {
-    return { values: {}, sources: [] };
-  }
-
-  const matches = await Promise.all(components.map(async (component) => {
-    try {
-      const result = await searchUSDA(component.name, 8, ['Foundation', 'SR Legacy', 'Survey (FNDDS)']);
-      const candidates = result.results
-        .filter((food) => SELECTED_MICRONUTRIENTS.some((key) => typeof food.nutrient_values?.[key] === 'number'))
-        .sort((a, b) => candidateScore(component.name, b) - candidateScore(component.name, a));
-      const best = candidates[0];
-      if (!best || candidateScore(component.name, best) < 5) return null;
-      return best;
-    } catch {
-      // The offline Indian-food reference below still provides known values if the public API is unavailable.
-      return null;
-    }
-  }));
-
-  for (let index = 0; index < components.length; index++) {
-    const component = components[index];
-    const match = matches[index];
-    const fallback = getIndianFoodMicronutrientFallback(component.name);
-    if (match?.nutrient_source) sources.add(match.nutrient_source);
-    if (fallback) sources.add(fallback.source);
-    const factor = (component.amount_g as number) / 100;
-
-    for (const key of SELECTED_MICRONUTRIENTS) {
-      // Prefer the selected food's online composition record; fill only genuinely missing entries from IFCT.
-      const databaseValue = finiteNonNegative(match?.nutrient_values?.[key]);
-      const fallbackValue = finiteNonNegative(fallback?.values[key]);
-      const per100g = databaseValue ?? fallbackValue;
-      if (per100g === null) {
-        covered[key] = false;
-      } else {
-        totals[key] = (totals[key] || 0) + per100g * factor;
-      }
-    }
-  }
-
-  const values: Record<string, number> = {};
-  for (const key of SELECTED_MICRONUTRIENTS) {
-    if (covered[key] && typeof totals[key] === 'number') {
-      values[key] = Math.round(totals[key] * 1000) / 1000;
-    }
-  }
-  return { values, sources: Array.from(sources) };
+function normalizeNutrients(value: unknown): Record<(typeof NUTRIENT_KEYS)[number], number | null> {
+  const source = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  return Object.fromEntries(NUTRIENT_KEYS.map((key) => [key, finiteNonNegative(source[key])]))
+    as Record<(typeof NUTRIENT_KEYS)[number], number | null>;
 }
 
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { allowed, retryAfterMs } = checkRateLimit(`ai:${session.user.id}`, AI_DAILY_LIMIT, AI_WINDOW_MS);
+  if (!process.env.GEMINI_API_KEY?.trim()) {
+    return NextResponse.json(
+      { error: 'Gemini API key is not configured on the server. Add GEMINI_API_KEY in Render Environment.' },
+      { status: 503 },
+    );
+  }
+
+  const { allowed, retryAfterMs } = checkRateLimit(\`ai:\${session.user.id}\`, AI_DAILY_LIMIT, AI_WINDOW_MS);
   if (!allowed) {
     const hours = Math.ceil(retryAfterMs / (1000 * 60 * 60));
     return NextResponse.json(
-      { error: `Daily AI limit reached (${AI_DAILY_LIMIT} requests). Try again in ~${hours} hour${hours > 1 ? 's' : ''}.` },
+      { error: \`Daily Gemini limit reached (\${AI_DAILY_LIMIT} requests). Try again in ~\${hours} hour\${hours > 1 ? 's' : ''}.\` },
       { status: 429, headers: { 'Retry-After': String(Math.ceil(retryAfterMs / 1000)) } },
     );
   }
@@ -236,81 +114,100 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { type, content, mediaType, context } = body;
-
     if (!type || !content) {
       return NextResponse.json({ error: 'Missing type or content' }, { status: 400 });
     }
 
-    let rawResponse: string;
+    // getProvider prefers Gemini when GEMINI_API_KEY is set; reject any fallback provider.
+    let provider = getProvider(type === 'image' ? 'vision' : 'text');
+    if (provider.name !== 'gemini') {
+      return NextResponse.json({ error: 'Food nutrition estimates must run through Gemini. Check GEMINI_API_KEY.' }, { status: 503 });
+    }
 
+    let rawResponse: string;
     if (type === 'text') {
-      const provider = getProvider('text');
       rawResponse = await provider.parseText(
-        'This is the complete food-log input. Understand Hindi, Hinglish, or English and estimate combined nutrition for every food and portion listed below. Input:\n\n' + content,
+        'Estimate the complete nutrition for this entire log in the quantities described. Input:\n\n' + String(content),
         SYSTEM_PROMPT,
       );
     } else if (type === 'image') {
-      if (!mediaType) {
-        return NextResponse.json({ error: 'Missing mediaType for image' }, { status: 400 });
-      }
-      const provider = getProvider('vision');
-      if (!provider.parseImage) {
-        return NextResponse.json({ error: 'No vision-capable AI provider configured' }, { status: 503 });
+      if (!mediaType || !provider.parseImage) {
+        return NextResponse.json({ error: 'Gemini image parsing requires an image media type.' }, { status: 400 });
       }
       const userPrompt = context
-        ? `Extract nutrition information from this image. Context: ${context}`
-        : 'Extract nutrition information from this image. If this is a nutrition label, read the exact values. If this is a photo of food, identify the food and estimate nutrition.';
-      rawResponse = await provider.parseImage(content, mediaType, SYSTEM_PROMPT, userPrompt);
+        ? 'Read a nutrition label accurately if this is a label. If it is a normal food photo, identify the visible food and estimate all nutrients for a reasonable visible portion. Context: ' + String(context)
+        : 'If this is a nutrition label, extract its visible values. Otherwise identify the food and estimate all macros and essential micronutrients for the pictured portion using your nutrition knowledge.';
+      rawResponse = await provider.parseImage(String(content), String(mediaType), SYSTEM_PROMPT, userPrompt);
     } else {
-      return NextResponse.json({ error: 'Invalid type. Use "text" or "image"' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid type. Use "text" or "image".' }, { status: 400 });
     }
 
-    // Clean up response — strip markdown fences if present
-    let cleaned = rawResponse.trim();
-    if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-    }
+    const rawFood = parseJsonObject(rawResponse);
+    let nutrientValues = normalizeNutrients(rawFood.nutrient_values);
 
-    const rawFood = JSON.parse(cleaned) as Record<string, unknown>;
-    const rawNutrients = rawFood.nutrient_values && typeof rawFood.nutrient_values === 'object' && !Array.isArray(rawFood.nutrient_values)
-      ? rawFood.nutrient_values as Record<string, unknown>
-      : {};
-    const explicitValues: Record<string, number> = {};
-    if (inputContainsExplicitNutrientData(String(type), content, context)) {
-      for (const key of SELECTED_MICRONUTRIENTS) {
-        const value = finiteNonNegative(rawNutrients[key]);
-        if (value !== null) explicitValues[key] = value;
+    // If Gemini omitted fields, ask Gemini once more to fill gaps based on the same food and portion.
+    // No USDA/IFCT/Open Food Facts or second AI provider is used.
+    if (NUTRIENT_KEYS.some((key) => nutrientValues[key] === null)) {
+      try {
+        const completion = await provider.parseText(
+          'Food log supplied by the user:\n' + String(type === 'text' ? content : context || 'Food photo') +
+          '\nGemini parsed food and portion:\n' + JSON.stringify({
+            description: rawFood.description,
+            serving_size: rawFood.default_serving_size,
+            serving_unit: rawFood.default_serving_unit,
+            energy_kcal: rawFood.energy_kcal,
+            protein_g: rawFood.protein_g,
+            fat_g: rawFood.fat_g,
+            carbs_g: rawFood.carbs_g,
+            current_nutrient_values: nutrientValues,
+          }) +
+          '\nFill the nutrient values that are null; confirm any known numeric value and keep the same total portion. Do not use an external source.',
+          MICRONUTRIENT_COMPLETION_PROMPT,
+        );
+        const completed = parseJsonObject(completion);
+        const completedValues = normalizeNutrients(completed.nutrient_values);
+        nutrientValues = Object.fromEntries(NUTRIENT_KEYS.map((key) => [
+          key, nutrientValues[key] !== null ? nutrientValues[key] : completedValues[key],
+        ])) as Record<(typeof NUTRIENT_KEYS)[number], number | null>;
+      } catch {
+        // Keep available first-pass values. If Gemini cannot estimate a field after retry, it remains unavailable.
       }
     }
 
-    let databaseValues: Record<string, number> = {};
-    let databaseSources: string[] = [];
-    const components = type === 'text' ? parseComponents(rawFood.items, rawFood, String(content)) : [];
-    if (components.length) {
-      const result = await lookupFoodMicronutrients(components);
-      databaseValues = result.values;
-      databaseSources = result.sources;
-    }
+    const description = typeof rawFood.description === 'string' && rawFood.description.trim()
+      ? rawFood.description.trim()
+      : String(content).slice(0, 200);
+    const source = type === 'image' && /nutrition\s*(?:facts|label|table)|food\s*label/i.test(String(context || ''))
+      ? 'Gemini AI label extraction plus Gemini food estimate'
+      : 'Gemini AI nutrition estimate';
 
-    // Values explicitly read from the user's label take precedence over generic food matches.
-    const finalNutrients = { ...databaseValues, ...explicitValues };
-    const explicitSource = typeof rawFood.nutrient_source === 'string' && rawFood.nutrient_source.trim()
-      ? rawFood.nutrient_source.trim()
-      : null;
-    const nutrientSource = databaseSources.length
-      ? `USDA FoodData Central (${databaseSources.join(', ')}) for available micronutrients; Gemini estimate for macros/portions${explicitSource ? `; supplied label values also used (${explicitSource})` : ''}`
-      : explicitSource;
     return NextResponse.json({
-      food: { ...rawFood, nutrient_values: finalNutrients, nutrient_source: nutrientSource },
+      food: {
+        description,
+        brand_name: typeof rawFood.brand_name === 'string' ? rawFood.brand_name : null,
+        default_serving_size: finiteNonNegative(rawFood.default_serving_size),
+        default_serving_unit: typeof rawFood.default_serving_unit === 'string' ? rawFood.default_serving_unit : 'g',
+        energy_kcal: finiteNonNegative(rawFood.energy_kcal),
+        protein_g: finiteNonNegative(rawFood.protein_g),
+        fat_g: finiteNonNegative(rawFood.fat_g),
+        saturated_fat_g: finiteNonNegative(rawFood.saturated_fat_g),
+        carbs_g: finiteNonNegative(rawFood.carbs_g),
+        fiber_g: finiteNonNegative(rawFood.fiber_g),
+        sugar_g: finiteNonNegative(rawFood.sugar_g),
+        sodium_mg: finiteNonNegative(rawFood.sodium_mg),
+        cholesterol_mg: finiteNonNegative(rawFood.cholesterol_mg),
+        nutrient_values: nutrientValues,
+        nutrient_source: source,
+      },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    if (message.includes('No AI provider')) {
+    if (message.includes('No AI provider') || message.includes('GEMINI_API_KEY')) {
       return NextResponse.json({ error: message }, { status: 503 });
     }
     if (message.includes('JSON') || message.includes('Unexpected token')) {
-      return NextResponse.json({ error: 'AI returned invalid data. Try again or enter manually.' }, { status: 502 });
+      return NextResponse.json({ error: 'Gemini returned invalid data. Retry extraction once.' }, { status: 502 });
     }
-    return NextResponse.json({ error: `AI parsing failed: ${message}` }, { status: 502 });
+    return NextResponse.json({ error: 'Gemini nutrition estimate failed: ' + message }, { status: 502 });
   }
 }

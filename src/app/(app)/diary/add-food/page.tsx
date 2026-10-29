@@ -200,7 +200,7 @@ function AddFoodForm() {
             </section>
             <section>
               <h3 className="mb-1 font-semibold text-gray-800">Essential Micronutrients</h3>
-              <p className="mb-3 text-xs text-gray-500">Micronutrients are looked up from food-composition data when a food match is available. Portion weights may be estimated; values the database does not report stay unavailable.</p>
+              <p className="mb-3 text-xs text-gray-500">Gemini estimates micronutrients from the food and portion you entered. Values are approximate, not lab-tested; when Gemini cannot make a reasonable estimate, the field stays unavailable.</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {[
                   { key: 'calcium', label: 'Calcium', unit: 'mg' },
