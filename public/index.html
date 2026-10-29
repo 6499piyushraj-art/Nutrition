@@ -73,11 +73,11 @@
           <div class="page-heading"><p class="eyebrow">FOOD JOURNAL</p><h1 id="log-heading">Log a meal</h1><p class="muted">Describe what you ate in English, Hindi, or Hinglish—or add a photo.</p></div>
           <div class="log-layout">
             <section class="panel input-panel">
-              <div class="panel-heading"><div><h2>What did you eat?</h2><p class="muted small">Include portion sizes for a better estimate.</p></div><span class="ai-chip">✳ Gemini AI</span></div>
+              <div class="panel-heading"><div><h2>What food or ingredient?</h2><p class="muted small">Type naturally in any language: a food, ingredient, dish, brand/product, recipe, or the full meal. Quantity is optional.</p></div><span class="ai-chip">✳ Gemini Search</span></div>
               <form id="analyze-form">
                 <label for="food-description">Meal description</label>
-                <textarea id="food-description" rows="4" maxlength="2000" placeholder="e.g. 2 medium roti, 1 bowl moong dal, 1 cup cooked rice and a small bowl of curd" spellcheck="true"></textarea>
-                <div class="example-prompts"><span>Try:</span><button class="example-chip" type="button" data-example="2 roti, 1 bowl dal, 1 cup cooked rice">Roti + dal + rice</button><button class="example-chip" type="button" data-example="1 glass cow milk and 1 medium banana">Milk + banana</button><button class="example-chip" type="button" data-example="1 plate poha with peanuts">Poha</button></div>
+                <textarea id="food-description" rows="4" placeholder="Write whatever food, ingredient, dish, packaged product or meal you want to analyze. Portion details help, but are not required." spellcheck="true"></textarea>
+                <p class="small muted input-guidance">Gemini will search food-composition information when useful, then fill the available nutrient fields. If you only know the food name, it will make a clearly labelled serving assumption.</p>
                 <div class="upload-zone" id="upload-zone">
                   <input id="food-photo" type="file" accept="image/jpeg,image/png,image/webp" hidden>
                   <div class="upload-symbol">▧</div><div class="upload-copy"><strong>Attach a meal photo</strong><p>JPG, PNG or WebP · processed for analysis, not saved to the server</p></div>
@@ -100,7 +100,7 @@
             <form id="save-form">
               <div class="form-grid review-name-grid"><div><label for="review-food-name">Food / meal name</label><input id="review-food-name" maxlength="120" required></div><div><label for="review-serving">Portion / serving</label><input id="review-serving" maxlength="120" required></div></div>
               <div id="review-nutrient-grid" class="review-nutrient-grid"></div>
-              <div class="ai-notes"><span>✳</span><div><strong>AI estimate notes</strong><p id="review-notes">Review the ingredients and serving size before saving.</p><p id="review-assumptions" class="small muted"></p></div></div>
+              <div class="ai-notes"><span>✳</span><div><strong>AI estimate notes</strong><p id="review-notes">Review the ingredients and serving size before saving.</p><p id="review-assumptions" class="small muted"></p><div id="review-sources" class="review-sources" aria-live="polite"></div></div></div>
               <div class="review-actions"><button id="discard-review" class="button button-ghost" type="button">Discard</button><button id="save-meal-button" class="button button-primary" type="submit">Save meal to my log <span>→</span></button></div>
             </form>
           </section>
