@@ -73,3 +73,28 @@ test("unknown micronutrients remain absent instead of being silently zeroed", as
   assert.match(client, /Not estimated/);
   assert.match(page, /values returned for logged meals/);
 });
+
+test("food input is natural-language and no longer truncated to a short fixed limit", async () => {
+  const page = await read("public/index.html");
+  const client = await read("public/app.js");
+  const server = await read("server.js");
+  assert.doesNotMatch(page, /maxlength="2000"/);
+  assert.doesNotMatch(page, /data-example=/);
+  assert.match(page, /Quantity is optional/i);
+  assert.doesNotMatch(client, /slice\(0, 2000\)/);
+  assert.doesNotMatch(server, /description\.trim\(\)\.slice\(0, 2000\)/);
+});
+
+test("Gemini uses grounded Google Search with structured output, handles images and avoids stored interactions", async () => {
+  const server = await read("server.js");
+  const client = await read("public/app.js");
+  const page = await read("public/index.html");
+  assert.match(server, /client\.interactions\.create/);
+  assert.match(server, /tools:\s*\[\{ type: "google_search" \}\]/);
+  assert.match(server, /response_format:\s*\{/);
+  assert.match(server, /store: false/);
+  assert.match(server, /type: "image", mime_type: suppliedImage\.mimeType, data: base64/);
+  assert.match(server, /extractGroundingSources/);
+  assert.match(client, /Google Search sources/);
+  assert.match(page, /id="review-sources"/);
+});
