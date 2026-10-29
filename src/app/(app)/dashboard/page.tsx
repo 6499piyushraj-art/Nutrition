@@ -40,18 +40,40 @@ function ProgressRing({ value, max, label, unit, color }: { value: number; max: 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     async function load() {
       try {
         const now = new Date();
         const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        const res = await fetch(`/api/dashboard?date=${localDate}&_t=${Date.now()}`);
-        if (res.ok) {
-          setData(await res.json());
+        const res = await fetch(`/api/dashboard?date=${localDate}&_t=${Date.now()}`, {
+          cache: 'no-store',
+          credentials: 'same-origin',
+        });
+
+        // A redeploy on ephemeral SQLite can invalidate an old login cookie.
+        // Clear stale cookies and send the user to sign in instead of showing a dead dashboard.
+        if (res.status === 401) {
+          try {
+            await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });
+          } catch {
+            // Continue to login even if the logout request cannot be completed.
+          }
+          window.location.replace('/login?reason=session-expired&redirect=%2Fdashboard');
+          return;
         }
-      } catch {
-        // Silent
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `Dashboard request failed (${res.status})`);
+        }
+
+        setData(await res.json());
+        setLoadError('');
+      } catch (error) {
+        console.error('[dashboard] Failed to load dashboard data:', error);
+        setLoadError(error instanceof Error ? error.message : 'Network error. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -64,7 +86,28 @@ export default function DashboardPage() {
   }
 
   if (!data) {
-    return <div className="text-center py-12 text-gray-500">Could not load dashboard</div>;
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-700 font-medium">Could not load dashboard</p>
+        <p className="text-sm text-gray-500 mt-2">
+          {loadError || 'Your session may have expired, or the server could not be reached.'}
+        </p>
+        <div className="flex justify-center gap-3 mt-5">
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded-lg bg-brand-600 text-white px-4 py-2.5 font-medium"
+          >
+            Try again
+          </button>
+          <Link
+            href="/login?redirect=%2Fdashboard"
+            className="rounded-lg border border-gray-300 text-gray-700 px-4 py-2.5 font-medium"
+          >
+            Sign in
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   const calGoal = data.profile?.daily_calorie_goal || 2000;
