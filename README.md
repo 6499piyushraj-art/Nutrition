@@ -1,49 +1,168 @@
-# MyNutri AI
+# Tally
 
-A mobile-friendly nutrition tracker that sends a food description or meal photo to Gemini **from the server**, returns a structured nutrition estimate, and fills an editable review form. Nothing is added to the log until the user confirms Save.
+**Your food, your goals, your data.**
+
+A mobile-first Progressive Web App for food logging, nutrition tracking, and health goals. Self-hosted with its own SQLite database and authentication — no external backend dependencies, no subscription fees, and your data stays on your server.
+
+## Why Tally?
+
+- **Free** — no subscription, no ads, no premium tiers
+- **Private** — your data lives on your own server, not in someone else's cloud
+- **Simple** — log what you eat, track your macros, see your progress
+- **AI-powered** — snap a photo or type a description and AI extracts the nutrition data
+- **Self-hosted** — deploy with Docker in minutes
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/login.jpg" alt="Login" width="200" />
+  <img src="docs/screenshots/dashboard.jpg" alt="Dashboard" width="200" />
+  <img src="docs/screenshots/diary.jpg" alt="Food Diary" width="200" />
+  <img src="docs/screenshots/my-foods.jpg" alt="My Foods" width="200" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/add-food.jpg" alt="Add Food" width="200" />
+  <img src="docs/screenshots/meals.jpg" alt="Meals" width="200" />
+</p>
 
 ## Features
 
-- Natural-language food names and descriptions in Hindi, Hinglish, English, and local dish names; portion amounts are optional, and long descriptions are no longer truncated to 2,000 characters.
-- Google Search grounding with structured nutrition output and source links when Gemini returns citations; packaged foods can be searched by brand/product name.
-- Server-side Gemini integration using `@google/genai` Interactions API with Google Search grounding and structured JSON results. Requests opt out of stored interaction history (`store: false`); Google API terms still govern provider processing.
-- Editable energy, macros, and selected micronutrients before saving.
-- Daily totals, target progress, food history, nutrient view, and JSON/CSV export.
-- Local-device storage for profile and food logs. No food log or uploaded photo is stored on the server.
-- Password-gated hosted app with signed, HttpOnly sessions and rate-limited login/analysis routes.
-- Render Blueprint included.
+- **Dashboard** — daily calorie progress bar, macro rings (protein/carbs/fat), quick actions
+- **Food Diary** — date-navigated daily diary with Breakfast/Lunch/Dinner/Snacks slots
+- **My Foods** — personal food catalog with search, tag filtering, full nutrition data
+- **AI Food Parser** — text or photo input parsed by AI into structured nutrition data
+- **Barcode Scanner** — camera-based UPC scanning via ZXing
+- **Saved Meals** — meal templates for quick logging of common combinations
+- **Health Journal** — timestamped journal entries tied to diary dates
+- **Profile & Goals** — calorie targets, macro goals, weight tracking
+- **Weight Chart** — visual weight trend over time
+- **Tag System** — organize foods with colored tags and filter by them
 
-## Run locally
+## Quick Start
 
-1. Install Node.js 20 or newer.
-2. Run `npm install`.
-3. Copy `.env.example` to `.env`.
-4. Add a real Gemini API key to `GEMINI_API_KEY`. Choose a strong value for `APP_PASSWORD` and a random secret of at least 32 characters for `SESSION_SECRET`.
-5. Run `npm start` and open `http://localhost:3000`.
+### Docker (recommended)
 
-For local use without a password, leave `APP_PASSWORD` blank only when `NODE_ENV` is not `production`. Analysis still requires `GEMINI_API_KEY`.
+```bash
+git clone https://github.com/genearnold/tally.git
+cd tally
+cp .env.example .env
+# Edit .env — at minimum set JWT_SECRET (run: openssl rand -hex 32)
+docker compose up -d --build
+```
 
-## Deploy to Render
+The app will be available at `http://localhost:8060`. Create an account and start logging.
 
-1. Connect this repository to Render, then create a Web Service from the Blueprint in `render.yaml` (or configure a Node Web Service directly).
-2. Set the following environment variables in Render's Environment settings:
-   - `GEMINI_API_KEY`: your key from Google AI Studio.
-   - `APP_PASSWORD`: a long password only you know.
-   - `SESSION_SECRET`: a random secret with at least 32 characters (Blueprint generation can create this automatically).
-   - `GEMINI_MODEL`: `gemini-3.8-flash` (configurable).
-   - `NODE_ENV`: `production`.
-3. Save changes and wait for the service to redeploy. The app shows a setup page and disables application/API access until the password and session secret are configured.
+### Local Development
 
-**Never put API keys in frontend files, a GitHub commit, or a screenshot.** Enter secrets only in Render's private environment settings. If a key has ever been committed, revoke it and create a new one.
+```bash
+git clone https://github.com/genearnold/tally.git
+cd tally
+npm install
+cp .env.example .env.local
+# Edit .env.local — set JWT_SECRET
+npm run db:migrate
+npm run dev
+```
 
-## Data and privacy
+Dev server runs at `http://localhost:3000`.
 
-Food logs, saved profile targets, and history live in this browser's local storage. They are not synced to other devices and can be removed by clearing browser storage. Meal photos are processed in memory, sent to the configured Gemini API for analysis, and not written to disk by this server. Google API terms and your account settings govern processing by Google. The hosted interface requires an app password.
+## Stack
 
-## Nutrition accuracy
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| Language | TypeScript 5 |
+| Styling | Tailwind CSS 4 |
+| Database | SQLite via better-sqlite3 + Drizzle ORM |
+| Auth | bcrypt + JWT (HttpOnly cookies) |
+| Charts | Recharts 3 |
+| Icons | Lucide React |
+| Barcode | ZXing |
+| AI | Groq (free text), Gemini Flash (free vision), Anthropic Haiku (fallback) |
 
-Nutrition results are AI estimates, not lab measurements or a verified nutrient database. Portion size, recipe, oil, ingredients, and cooking methods can significantly change values. Micronutrients the model cannot reasonably estimate are left blank rather than treated as zero. Check package labels or reliable food-composition references when precision matters. The app is not medical advice; personal nutrition needs, especially for teenagers, should be discussed with a trusted adult and qualified health professional.
+## AI Providers
 
-## Checks
+AI food parsing is optional — the app works fine without it. If configured, Tally uses the cheapest available provider:
 
-Run `npm test` for the smoke tests. The `/health` endpoint is intended for Render's health check and does not reveal configuration secrets.
+| Task | Provider | Model | Cost |
+|---|---|---|---|
+| Text parsing | Groq | GPT-OSS-20B | Near-free (~$0.08/M tokens) |
+| Vision (photos) | Google Gemini | 2.5 Flash | Free |
+| Fallback | Anthropic | Haiku 4.5 | ~$0.25/MTok |
+
+Get free API keys:
+- **Groq**: https://console.groq.com/
+- **Gemini**: https://aistudio.google.com/apikey
+- **USDA** (food search): https://fdc.nal.usda.gov/api-key-signup
+
+## Environment Variables
+
+See [`.env.example`](.env.example) for all options. The only required variable is `JWT_SECRET`.
+
+| Variable | Required | Description |
+|---|---|---|
+| `JWT_SECRET` | Yes | Secret for signing auth tokens. Generate with `openssl rand -hex 32` |
+| `DATABASE_PATH` | No | SQLite path (default: `./data/health.db`) |
+| `COOKIE_SECURE` | No | Set to `true` if serving over HTTPS |
+| `GROQ_API_KEY` | No | Enables free AI text parsing |
+| `GEMINI_API_KEY` | No | Enables free AI photo parsing |
+| `ANTHROPIC_API_KEY` | No | Fallback AI provider |
+| `USDA_API_KEY` | No | Enables USDA food database search |
+
+## Database
+
+SQLite database managed by Drizzle ORM. 14 tables covering users, foods, diary entries, meals, measurements, and more.
+
+```bash
+npm run db:generate   # Generate migration from schema changes
+npm run db:migrate    # Apply migrations
+npm run db:studio     # Open Drizzle Studio (visual DB browser)
+```
+
+Migrations run automatically on Docker container startup.
+
+## Security
+
+- **Authentication** — bcrypt password hashing + JWT tokens in HttpOnly cookies
+- **Rate limiting** — login endpoint (5 attempts/15 min per IP), AI endpoint (50 requests/day per user)
+- **Soft delete** — foods, meals, tags, and journal entries are soft-deleted (recoverable)
+- **No external dependencies** — all data stays in your SQLite database
+
+For production deployments, consider adding:
+- A reverse proxy with HTTPS (nginx, Caddy, or Cloudflare Tunnel)
+- Cloudflare Access or similar for email-based access control
+- Regular database backups
+
+## Documentation
+
+- [Deployment Guide](docs/DEPLOYMENT.md) — detailed setup, configuration, and hosting options
+- [User Guide](docs/USER-GUIDE.md) — how to use every feature in the app
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── (auth)/           # Login, signup pages
+│   ├── (app)/            # Main app pages (with bottom nav)
+│   │   ├── dashboard/    # Today's summary + quick actions
+│   │   ├── diary/        # Daily food diary + add food
+│   │   ├── meals/        # Saved meal templates
+│   │   ├── my-foods/     # Food catalog (CRUD)
+│   │   ├── profile/      # Settings, goals, tags, password
+│   │   └── progress/     # Weight chart
+│   └── api/              # All API routes
+├── components/           # React components
+├── lib/
+│   ├── db/               # Database schema, connection, helpers
+│   ├── auth.ts           # Authentication logic
+│   ├── rate-limit.ts     # In-memory rate limiter
+│   ├── ai-food-parser.ts # AI text + image food parsing
+│   ├── ai-providers.ts   # AI provider configuration
+│   └── usda.ts           # USDA FoodData Central API client
+└── middleware.ts          # Auth guard
+```
+
+## License
+
+[MIT](LICENSE)
