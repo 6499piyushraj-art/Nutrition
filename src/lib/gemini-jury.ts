@@ -24,7 +24,7 @@ const NUMERIC_FIELDS = [
 const cache = new Map<string, { result: JsonObject; at: number }>();
 
 function splitValues(value: string | undefined): string[] {
-  return (value || '').split(',').flatMap((part) => part.split(';')).flatMap((part) => part.split('\n'));
+  return (value || '').split(',').flatMap((part) => part.split(';')).flatMap((part) => part.split(String.fromCharCode(10)));
 }
 
 function keys(): string[] {
@@ -47,7 +47,7 @@ function models(): string[] {
 
 function parseJsonObject(input: string): JsonObject {
   let cleaned = input.trim();
-  const fence = '\u0060\u0060\u0060';
+  const fence = String.fromCharCode(96, 96, 96);
   if (cleaned.startsWith(fence)) {
     cleaned = cleaned.slice(3).trim();
     if (cleaned.slice(0, 4).toLowerCase() === 'json') cleaned = cleaned.slice(4).trim();
