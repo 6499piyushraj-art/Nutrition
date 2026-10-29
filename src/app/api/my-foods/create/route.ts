@@ -30,9 +30,11 @@ export async function POST(request: Request) {
       carbohydrateG: body.carbs_g || null,
       dietaryFiberG: body.fiber_g || null,
       totalSugarsG: body.sugar_g || null,
-      sodiumMg: body.sodium_mg || null,
-      saturatedFatG: body.saturated_fat_g || null,
-      cholesterolMg: body.cholesterol_mg || null,
+      sodiumMg: body.sodium_mg ?? null,
+      saturatedFatG: body.saturated_fat_g ?? null,
+      cholesterolMg: body.cholesterol_mg ?? null,
+      nutrientValues: body.nutrient_values && typeof body.nutrient_values === 'object' && !Array.isArray(body.nutrient_values) ? body.nutrient_values : null,
+      nutrientSource: typeof body.nutrient_source === 'string' ? body.nutrient_source : null,
     };
 
     // Insert food

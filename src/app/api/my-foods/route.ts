@@ -42,6 +42,8 @@ export async function GET(request: Request) {
         sodiumMg: schema.foods.sodiumMg,
         saturatedFatG: schema.foods.saturatedFatG,
         cholesterolMg: schema.foods.cholesterolMg,
+        nutrientValues: schema.foods.nutrientValues,
+        nutrientSource: schema.foods.nutrientSource,
       })
       .from(schema.foods)
       .where(and(...conditions))
@@ -131,6 +133,8 @@ export async function GET(request: Request) {
       sodium_mg: f.sodiumMg,
       saturated_fat_g: f.saturatedFatG,
       cholesterol_mg: f.cholesterolMg,
+      nutrient_values: f.nutrientValues,
+      nutrient_source: f.nutrientSource,
       tags: f.tags,
     }));
 
