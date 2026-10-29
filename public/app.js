@@ -351,6 +351,35 @@ function fillReview(result) {
   if (Array.isArray(result.assumptions)) assumptions.push.apply(assumptions, result.assumptions);
   if (Array.isArray(result.missingDetails) && result.missingDetails.length) assumptions.push("For a better estimate: " + result.missingDetails.join("; "));
   document.getElementById("review-assumptions").textContent = assumptions.join(" · ");
+
+  const sourcesHost = document.getElementById("review-sources");
+  sourcesHost.replaceChildren();
+  const sources = Array.isArray(result.sources) ? result.sources : [];
+  if (sources.length) {
+    const heading = document.createElement("strong");
+    heading.textContent = "Google Search sources";
+    sourcesHost.appendChild(heading);
+    const list = document.createElement("div");
+    list.className = "source-links";
+    sources.slice(0, 8).forEach(function (source) {
+      try {
+        const url = new URL(String(source.url || ""));
+        if (!["http:", "https:"].includes(url.protocol)) return;
+        const link = document.createElement("a");
+        link.href = url.href;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = String(source.title || url.hostname).slice(0, 160);
+        list.appendChild(link);
+      } catch {
+        // Ignore malformed source links returned by the provider.
+      }
+    });
+    if (list.childElementCount) sourcesHost.appendChild(list);
+  } else {
+    sourcesHost.textContent = "Google Search grounding was enabled. No citation links were returned for this estimate.";
+  }
+
   const panel = document.getElementById("review-panel");
   panel.hidden = false;
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -479,6 +508,7 @@ function setPhoto(file) {
     return;
   }
   selectedPhoto = file;
+  lastAttemptedSignature = "";
   document.getElementById("photo-file-name").textContent = file.name;
   preview.hidden = false;
   const reader = new FileReader();
@@ -685,17 +715,11 @@ function bindEvents() {
     const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
     if (file) setPhoto(file);
   });
-  document.querySelectorAll("[data-example]").forEach(function (button) {
-    button.addEventListener("click", function () {
-      document.getElementById("food-description").value = button.dataset.example;
-      document.getElementById("food-description").focus();
-      scheduleAutoAnalysis(350);
-    });
-  });
   document.getElementById("targets-form").addEventListener("submit", saveTargets);
   document.getElementById("target-fields").addEventListener("input", updateEnergyNote);
   document.getElementById("food-description").addEventListener("input", function () {
-    scheduleAutoAnalysis(1800);
+    lastAttemptedSignature = "";
+    scheduleAutoAnalysis(2200);
   });
   document.getElementById("export-json-button").addEventListener("click", exportJson);
   document.getElementById("export-csv-button").addEventListener("click", exportCsv);

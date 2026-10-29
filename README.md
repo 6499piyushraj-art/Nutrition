@@ -4,8 +4,9 @@ A mobile-friendly nutrition tracker that sends a food description or meal photo 
 
 ## Features
 
-- Hindi, English, and Hinglish food descriptions, plus meal-photo analysis.
-- Server-side Google Gemini integration using `@google/genai`.
+- Natural-language food names and descriptions in Hindi, Hinglish, English, and local dish names; portion amounts are optional, and long descriptions are no longer truncated to 2,000 characters.
+- Google Search grounding with structured nutrition output and source links when Gemini returns citations; packaged foods can be searched by brand/product name.
+- Server-side Gemini integration using `@google/genai` Interactions API with Google Search grounding and structured JSON results. Requests opt out of stored interaction history (`store: false`); Google API terms still govern provider processing.
 - Editable energy, macros, and selected micronutrients before saving.
 - Daily totals, target progress, food history, nutrient view, and JSON/CSV export.
 - Local-device storage for profile and food logs. No food log or uploaded photo is stored on the server.
