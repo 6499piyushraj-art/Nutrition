@@ -1,6 +1,6 @@
 import { NUTRIENT_MAP, USDA_BASE_URL } from './constants';
 
-const USDA_API_KEY = process.env.USDA_API_KEY || '';
+const USDA_API_KEY = process.env.USDA_API_KEY?.trim() || 'DEMO_KEY';
 
 export interface StrippedFood {
   fdc_id: number;
@@ -26,6 +26,9 @@ export interface SearchResult {
   total: number;
   results: StrippedFood[];
 }
+
+const SEARCH_CACHE = new Map<string, { expiresAt: number; result: SearchResult }>();
+const SEARCH_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 
 const FDC_MICRONUTRIENT_MAP: Record<number, { key: string; factor: number }> = {
   1087: { key: 'calcium', factor: 1 }, 1089: { key: 'iron', factor: 1 },
@@ -87,12 +90,19 @@ function stripFood(food: Record<string, unknown>): StrippedFood {
 
 export async function searchUSDA(query: string, limit = 10, dataTypes?: string[]): Promise<SearchResult> {
   const types = dataTypes || ['Branded', 'Survey (FNDDS)'];
+  const safeQuery = query.trim();
+  if (!safeQuery) return { query, total: 0, results: [] };
 
-  const res = await fetch(`${USDA_BASE_URL}/foods/search?api_key=${USDA_API_KEY}`, {
+  const cacheKey = JSON.stringify([safeQuery.toLowerCase(), Math.min(limit, 25), types]);
+  const cached = SEARCH_CACHE.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
+  if (cached) SEARCH_CACHE.delete(cacheKey);
+
+  const res = await fetch(`${USDA_BASE_URL}/foods/search?api_key=${encodeURIComponent(USDA_API_KEY)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      query,
+      query: safeQuery,
       pageSize: Math.min(limit, 25),
       dataType: types,
     }),
@@ -104,13 +114,17 @@ export async function searchUSDA(query: string, limit = 10, dataTypes?: string[]
   }
 
   const data = await res.json();
-  const results = ((data.foods || []) as Record<string, unknown>[]).map(stripFood);
-
-  return {
-    query,
+  const result: SearchResult = {
+    query: safeQuery,
     total: data.totalHits || 0,
-    results,
+    results: ((data.foods || []) as Record<string, unknown>[]).map(stripFood),
   };
+  if (SEARCH_CACHE.size >= 150) {
+    const firstKey = SEARCH_CACHE.keys().next().value;
+    if (firstKey) SEARCH_CACHE.delete(firstKey);
+  }
+  SEARCH_CACHE.set(cacheKey, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, result });
+  return result;
 }
 
 export async function lookupBarcodeOpenFoodFacts(upc: string): Promise<StrippedFood | null> {

@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { getProvider } from '@/lib/ai-providers';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { searchUSDA, type StrippedFood } from '@/lib/usda';
+import { getIndianFoodMicronutrientFallback } from '@/lib/indian-food-fallback';
 
 const AI_DAILY_LIMIT = 50;
 const AI_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -71,17 +72,31 @@ const SELECTED_MICRONUTRIENTS = [
 
 type FoodComponent = { name: string; amount_g: number | null };
 
+function inputContainsExplicitNutrientData(type: string, content: unknown, context: unknown): boolean {
+  if (type === 'image') {
+    return /nutrition\s*(?:facts|label|table)|food\s*label/i.test(typeof context === 'string' ? context : '');
+  }
+  const text = typeof content === 'string' ? content.toLowerCase() : '';
+  const nutrientNames = '(?:calcium|iron|zinc|vitamin\\s*d|vitamin\\s*b\\s*-?\\s*12|b12|folate|vitamin\\s*c|vitamin\\s*a|iodine)';
+  return new RegExp(nutrientNames + '\\s*[:=]?\\s*\\d', 'i').test(text)
+    || new RegExp('\\d+(?:[.,]\\d+)?\\s*(?:mg|mcg|µg|ug)\\s+(?:of\\s*)?' + nutrientNames, 'i').test(text);
+}
+
 function finiteNonNegative(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 function cleanFoodQuery(value: string): string {
   return value
-    .replace(/\\b\\d+(?:[.,]\\d+)?\\s*(?:kg|kgs|g|gram(?:s)?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?|cups?|glasses?|katoris?|bowls?|pieces?|slices?)\\b/gi, ' ')
-    .replace(/\\b\\d+(?:[.,]\\d+)?\\s*x\\s*/gi, ' ')
-    .replace(/[()[\\]{}]/g, ' ')
-    .replace(/\\s+/g, ' ')
+    .replace(/\b\d+(?:[.,]\d+)?\s*(?:kg|kgs|g|gram(?:s)?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?|cups?|glasses?|katoris?|bowls?|pieces?|slices?)\b/gi, ' ')
+    .replace(/\b\d+(?:[.,]\d+)?\s*x\s*/gi, ' ')
+    .replace(/[\(\)\[\]\{\}]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
+}
+
+function finiteNonNegative(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 function amountFromServing(size: unknown, unitValue: unknown): number | null {
@@ -91,10 +106,23 @@ function amountFromServing(size: unknown, unitValue: unknown): number | null {
   if (/^(kg|kilograms?)$/.test(unit)) return sizeNumber * 1000;
   if (/^(g|gram|grams)$/.test(unit)) return sizeNumber;
   if (/^(ml|millilit(?:er|re)s?)$/.test(unit)) return sizeNumber;
+  if (/^(l|lit(?:er|re)s?)$/.test(unit)) return sizeNumber * 1000;
   return null;
 }
 
-function parseComponents(rawItems: unknown, rawFood: Record<string, unknown>): FoodComponent[] {
+function explicitGramsFromText(text: string): number | null {
+  const matches = Array.from(text.matchAll(/(\d+(?:[.,]\d+)?)\s*(kg|kgs|g|grams?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?)\b/gi));
+  if (matches.length !== 1) return null;
+  const amount = Number(matches[0][1].replace(',', '.'));
+  const unit = matches[0][2].toLowerCase();
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 10000) return null;
+  if (/^(kg|kgs)$/.test(unit)) return amount * 1000;
+  if (/^(l|liters?|litres?)$/.test(unit)) return amount * 1000;
+  return amount; // For milk-like liquids, 1 ml is approximately 1 g.
+}
+
+function parseComponents(rawItems: unknown, rawFood: Record<string, unknown>, userText: string): FoodComponent[] {
+  const explicitAmount = explicitGramsFromText(userText);
   if (Array.isArray(rawItems)) {
     const parsed = rawItems.slice(0, 8).map((entry) => {
       if (!entry || typeof entry !== 'object') return null;
@@ -105,25 +133,26 @@ function parseComponents(rawItems: unknown, rawFood: Record<string, unknown>): F
       return { name, amount_g: amount !== null && amount > 0 && amount <= 10000 ? amount : null };
     }).filter((item): item is FoodComponent => item !== null);
     if (parsed.length) {
-      if (parsed.length === 1 && parsed[0].amount_g === null) {
-        parsed[0].amount_g = amountFromServing(rawFood.default_serving_size, rawFood.default_serving_unit);
+      if (parsed.length === 1) {
+        parsed[0].amount_g = explicitAmount ?? parsed[0].amount_g
+          ?? amountFromServing(rawFood.default_serving_size, rawFood.default_serving_unit);
       }
       return parsed;
     }
   }
 
-  // Backward-compatible fallback: only look up a clearly single-food description.
+  // Compatibility fallback for older model outputs: only look up a clearly single-food description.
   const description = typeof rawFood.description === 'string' ? rawFood.description : '';
-  if (!description || /[,;+]|\\b(?:and|with|plus|aur|or)\\b/i.test(description)) return [];
+  if (!description || /[,;+]|\b(?:and|with|plus|aur|or)\b/i.test(description)) return [];
   const name = cleanFoodQuery(description);
-  const amount = amountFromServing(rawFood.default_serving_size, rawFood.default_serving_unit);
+  const amount = explicitAmount ?? amountFromServing(rawFood.default_serving_size, rawFood.default_serving_unit);
   return name ? [{ name, amount_g: amount }] : [];
 }
 
 function candidateScore(query: string, food: StrippedFood): number {
   const normalizeTokens = (text: string) => cleanFoodQuery(text.toLowerCase())
     .replace(/[^a-z0-9 ]/g, ' ')
-    .split(/\\s+/)
+    .split(/\s+/)
     .filter((token) => token.length > 1 && !['and', 'with', 'raw', 'fresh', 'food'].includes(token));
   const queryTokens = Array.from(new Set(normalizeTokens(query)));
   const foodTokens = new Set(normalizeTokens(food.description));
@@ -158,27 +187,30 @@ async function lookupFoodMicronutrients(components: FoodComponent[]): Promise<{
         .sort((a, b) => candidateScore(component.name, b) - candidateScore(component.name, a));
       const best = candidates[0];
       if (!best || candidateScore(component.name, best) < 5) return null;
-      return { component, food: best };
+      return best;
     } catch {
-      // Optional database enrichment must not block the food log.
+      // The offline Indian-food reference below still provides known values if the public API is unavailable.
       return null;
     }
   }));
 
   for (let index = 0; index < components.length; index++) {
+    const component = components[index];
     const match = matches[index];
-    if (!match) {
-      for (const key of SELECTED_MICRONUTRIENTS) covered[key] = false;
-      continue;
-    }
-    sources.add(match.food.data_type || 'FoodData Central');
-    const factor = (match.component.amount_g as number) / 100;
+    const fallback = getIndianFoodMicronutrientFallback(component.name);
+    if (match?.nutrient_source) sources.add(match.nutrient_source);
+    if (fallback) sources.add(fallback.source);
+    const factor = (component.amount_g as number) / 100;
+
     for (const key of SELECTED_MICRONUTRIENTS) {
-      const value = finiteNonNegative(match.food.nutrient_values?.[key]);
-      if (value === null) {
+      // Prefer the selected food's online composition record; fill only genuinely missing entries from IFCT.
+      const databaseValue = finiteNonNegative(match?.nutrient_values?.[key]);
+      const fallbackValue = finiteNonNegative(fallback?.values[key]);
+      const per100g = databaseValue ?? fallbackValue;
+      if (per100g === null) {
         covered[key] = false;
       } else {
-        totals[key] = (totals[key] || 0) + value * factor;
+        totals[key] = (totals[key] || 0) + per100g * factor;
       }
     }
   }
@@ -248,14 +280,16 @@ export async function POST(request: Request) {
       ? rawFood.nutrient_values as Record<string, unknown>
       : {};
     const explicitValues: Record<string, number> = {};
-    for (const key of SELECTED_MICRONUTRIENTS) {
-      const value = finiteNonNegative(rawNutrients[key]);
-      if (value !== null) explicitValues[key] = value;
+    if (inputContainsExplicitNutrientData(String(type), content, context)) {
+      for (const key of SELECTED_MICRONUTRIENTS) {
+        const value = finiteNonNegative(rawNutrients[key]);
+        if (value !== null) explicitValues[key] = value;
+      }
     }
 
     let databaseValues: Record<string, number> = {};
     let databaseSources: string[] = [];
-    const components = type === 'text' ? parseComponents(rawFood.items, rawFood) : [];
+    const components = type === 'text' ? parseComponents(rawFood.items, rawFood, String(content)) : [];
     if (components.length) {
       const result = await lookupFoodMicronutrients(components);
       databaseValues = result.values;
