@@ -719,7 +719,7 @@ function bindEvents() {
   document.getElementById("target-fields").addEventListener("input", updateEnergyNote);
   document.getElementById("food-description").addEventListener("input", function () {
     lastAttemptedSignature = "";
-    scheduleAutoAnalysis(2200);
+    scheduleAutoAnalysis(900);
   });
   document.getElementById("export-json-button").addEventListener("click", exportJson);
   document.getElementById("export-csv-button").addEventListener("click", exportCsv);
