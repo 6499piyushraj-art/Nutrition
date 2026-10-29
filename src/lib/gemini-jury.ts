@@ -12,7 +12,7 @@ export const GEMINI_JURY_MODELS = [
 ] as const;
 
 type JsonObject = Record<string, unknown>;
-type Candidate = { model: string; json: JsonObject };
+type Candidate = { model: string; json: JsonObject; attemptedModels: string[] };
 const NUTRIENT_KEYS = [
   'omega3', 'calcium', 'iron', 'zinc', 'vitamin_d',
   'b12', 'folate', 'vitamin_c', 'vitamin_a', 'iodine',
@@ -149,9 +149,11 @@ async function callGemini(
   if (availableModels.length === 0) throw new Error('No Gemini models configured');
 
   let lastError = 'Gemini request failed';
+  const attemptedModels: string[] = [];
   // Try every configured key for a model before advancing to the next model.
   for (let modelOffset = 0; modelOffset < availableModels.length; modelOffset += 1) {
     const model = availableModels[(offset + modelOffset) % availableModels.length];
+    attemptedModels.push(model);
     for (let keyOffset = 0; keyOffset < apiKeys.length; keyOffset += 1) {
       const apiKey = apiKeys[(offset + keyOffset) % apiKeys.length];
       try {
@@ -192,7 +194,7 @@ async function callGemini(
           lastError = model + ' returned no text';
           continue;
         }
-        return { model, json: parseJsonObject(output) };
+        return { model, json: parseJsonObject(output), attemptedModels: [...attemptedModels] };
       } catch (error) {
         lastError = error instanceof Error ? error.message : model + ' failed';
       }
@@ -222,8 +224,9 @@ export async function runGeminiNutritionJury(
   input: { type: string; content: string; mediaType?: string; context?: string },
 ): Promise<{ food: JsonObject; cached: boolean }> {
   const availableModels = models();
+  const estimatorCount = Math.max(2, positiveIntEnv('GEMINI_JURY_ESTIMATORS', 5, 5));
   const hash = createHash('sha256').update(JSON.stringify([
-    input.type, input.content, input.mediaType || '', input.context || '', availableModels,
+    input.type, input.content, input.mediaType || '', input.context || '', availableModels, estimatorCount,
   ])).digest('hex');
 
   const prior = cache.get(hash);
@@ -252,7 +255,6 @@ export async function runGeminiNutritionJury(
     'Independently estimate all values and identify uncertainty.',
   ];
 
-  const estimatorCount = Math.max(2, positiveIntEnv('GEMINI_JURY_ESTIMATORS', 5, roles.length));
   const activeRoles = roles.slice(0, estimatorCount);
   const estimators = await Promise.all(activeRoles.map(async (role, index) => {
     try {
@@ -275,6 +277,7 @@ export async function runGeminiNutritionJury(
   const baseline = consensus(successful.map((candidate) => candidate.json));
   let finalSource: JsonObject = baseline;
   let judgeModel: string | null = null;
+  let judgeAttemptedModels: string[] = [];
   let reviewSummary = 'Median consensus used because the judge was unavailable.';
   let agreement = 'medium';
 
@@ -294,6 +297,7 @@ export async function runGeminiNutritionJury(
     );
     finalSource = judge.json;
     judgeModel = judge.model;
+    judgeAttemptedModels = judge.attemptedModels;
     reviewSummary = textOrNull(judge.json.review_summary) || 'Compared independent estimates and checked for outliers.';
     const reportedAgreement = textOrNull(judge.json.agreement);
     agreement = reportedAgreement && ['high', 'medium', 'low'].includes(reportedAgreement.toLowerCase())
@@ -304,9 +308,17 @@ export async function runGeminiNutritionJury(
 
   const food = normalizeFood(finalSource, baseline);
   food.jury = {
+    requestedEstimators: estimatorCount,
     estimatorsCompared: successful.length,
     estimatorModels: successful.map((candidate) => candidate.model),
+    estimatorRuns: successful.map((candidate) => ({
+      successfulModel: candidate.model,
+      attemptedModels: candidate.attemptedModels,
+      failoverUsed: candidate.attemptedModels.length > 1,
+    })),
     judgeModel,
+    judgeAttemptedModels,
+    judgeFailoverUsed: judgeAttemptedModels.length > 1,
     agreement,
     reviewSummary,
     cached: false,
