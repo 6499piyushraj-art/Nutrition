@@ -1,38 +1,11 @@
-/**
- * Multi-model Gemini nutrition jury.
- * Five independent estimators are cross-reviewed by a final Gemini judge.
- * This module is intentionally isolated until wired into the food parser route.
- */
-export const GEMINI_JURY_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-lite",
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-8b",
-  "gemini-2.5-pro",
-] as const;
-
-export type JuryEstimate = {
-  model: string;
-  nutrition: Record<string, number | null>;
-};
-
-export function median(values: Array<number | null>): number | null {
-  const sorted = values.filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0).sort((a,b)=>a-b);
-  if (!sorted.length) return null;
-  const i = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[i] : (sorted[i-1] + sorted[i]) / 2;
-}
-
-export function buildConsensus(estimates: JuryEstimate[]): Record<string, number | null> {
-  const keys = [...new Set(estimates.flatMap(e => Object.keys(e.nutrition)))];
-  return Object.fromEntries(keys.map(key => [key, median(estimates.map(e => e.nutrition[key] ?? null))]));
-}
-
-export function getGeminiKeys(): string[] {
-  return [...new Set([
-    process.env.GEMINI_API_KEY || "",
-    ...(process.env.GEMINI_API_KEYS || "").split(/[\n,;]+/),
-  ].map(s=>s.trim()).filter(Boolean))].slice(0,7);
-}
+import { createHash } from 'node:crypto';
+export const GEMINI_JURY_MODELS = ['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash','gemini-2.0-flash-lite','gemini-2.5-pro','gemini-1.5-flash','gemini-1.5-flash-8b'] as const;
+type JsonObject=Record<string,unknown>;
+const cache=new Map<string,{result:JsonObject;at:number}>();
+const keys=()=>[...new Set([process.env.GEMINI_API_KEY||'',...(process.env.GEMINI_API_KEYS||'').split(/[,;\\n]+/)].map(x=>x.trim()).filter(Boolean))].slice(0,7);
+const models=()=>[...new Set([(process.env.GEMINI_MODEL||''),...(process.env.GEMINI_FAILOVER_MODELS||'').split(/[,;\\n]+'),...GEMINI_JURY_MODELS].map(x=>x.trim().replace(/^models\\//,'')).filter(Boolean))].slice(0,7);
+function parse(s:string):JsonObject {const t=s.trim().replace(/^\`\`\`(?:json)?\\s*/i,'').replace(/\\s*\`\`\`$/,'');const v:unknown=JSON.parse(t);if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Invalid Gemini JSON');return v as JsonObject;}
+async function call(parts:unknown[],system:string,offset:number):Promise<{json:JsonObject;model:string}>{const k=keys(),m=models();if(!k.length)throw Error('GEMINI_API_KEY is missing');let last='Gemini failed';for(let i=0;i<m.length;i++){const model=m[(offset+i)%m.length],key=k[(offset+i)%k.length];try{const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'content-type':'application/json'},signal:AbortSignal.timeout(25000),body:JSON.stringify({system_instruction:{parts:[{text:system}]},contents:[{parts}],generationConfig:{temperature:.15,maxOutputTokens:1600,responseMimeType:'application/json'}})});if(!r.ok){last=model+' '+r.status;continue;}const d=await r.json() as {candidates?:Array<{content?:{parts?:Array<{text?:string}>}}>} ;const t=d.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('');if(t)return {json:parse(t),model};}catch{last=model+' failed';}}throw Error(last);}
+function median(v:Array<number|null>):number|null{const a=v.filter((x):x is number=>typeof x==='number'&&Number.isFinite(x)&&x>=0).sort((x,y)=>x-y);if(!a.length)return null;const i=Math.floor(a.length/2);return a.length%2?a[i]:(a[i-1]+a[i])/2;}
+function consensus(rows:JsonObject[]):JsonObject{const first=rows[0]||{},n=Object.keys((first.nutrient_values||{}) as JsonObject),out:JsonObject={...first};for(const f of ['energy_kcal','protein_g','fat_g','saturated_fat_g','carbs_g','fiber_g','sugar_g','sodium_mg','cholesterol_mg','default_serving_size'])out[f]=median(rows.map(r=>typeof r[f]==='number'&&Number(r[f])>=0?Number(r[f]):null));out.nutrient_values=Object.fromEntries(n.map(k=>[k,median(rows.map(r=>{const v=(r.nutrient_values as JsonObject)?.[k];return typeof v==='number'&&v>=0?v:null;}))]));return out;}
+export async function runGeminiNutritionJury(input:{type:string;content:string;mediaType?:string;context?:string}):Promise<{food:JsonObject;cached:boolean}>{const hash=createHash('sha256').update(JSON.stringify([input.type,input.content,input.mediaType||'',input.context||'',models()])).digest('hex'),old=cache.get(hash);if(old&&Date.now()-old.at<30*86400000)return {food:{...old.result,jury:{...((old.result.jury||{}) as JsonObject),cached:true}},cached:true};const parts=input.type==='image'?[{inline_data:{mime_type:input.mediaType||'image/jpeg',data:input.content}},{text:'Food context: '+(input.context||'Identify food and portion.')}]:[{text:'User food log: '+input.content}];const prompt='Estimate entire logged portion of food, understand Hindi/Hinglish/Indian foods. For plain cow milk calcium is about 110-125mg per 100g. Return JSON keys description,brand_name,default_serving_size,default_serving_unit,energy_kcal,protein_g,fat_g,saturated_fat_g,carbs_g,fiber_g,sugar_g,sodium_mg,cholesterol_mg,nutrient_values,nutrient_source. nutrient_values keys omega3(g), calcium/iron/zinc/vitamin_c(mg), vitamin_d/b12/folate/vitamin_a/iodine(micrograms). Estimate all for common foods; null only if truly not estimable, zero if essentially none. Do not invent ingredients. JSON only.';const roles=['estimate macros and portion independently','focus on micronutrients and units','focus on Indian foods and serving sizes','check nutrition plausibility and consistency','independently estimate and identify uncertainty'];const candidates=await Promise.all(roles.map(async(role,i)=>{try{const r=await call([...parts,{text:'Independent estimator role: '+role+'. Estimate without seeing other answers.'}],prompt,i);return {model:r.model,json:r.json};}catch{return null;}}));const good=candidates.filter((x):x is {model:string;json:JsonObject}=>x!==null);if(good.length<2)throw Error('At least two Gemini estimates unavailable; check model access and quota.');const middle=consensus(good.map(x=>x.json));let final=middle,judgeModel:string|null=null,review='Median consensus used because the judge was unavailable.',agreement='medium';try{const j=await call([...parts,{text:'Judge these independent estimates, reject outliers field-by-field, check units and portion, return best final JSON with same fields plus review_summary and agreement high/medium/low. Estimates: '+JSON.stringify(good)+' Median fallback: '+JSON.stringify(middle)}],'You are an independent nutrition quality judge. Compare estimates carefully and return the best-supported final nutrition JSON only.',5);final=j.json;judgeModel=j.model;review=typeof final.review_summary==='string'?final.review_summary:'Compared independent estimates and checked outliers.';agreement=typeof final.agreement==='string'?final.agreement:'medium';}catch{}final.nutrient_source='Gemini multi-estimate jury and judge; approximate, not lab-tested';final.jury={estimatesCompared:good.length,estimatorModels:good.map(x=>x.model),judgeModel,agreement,reviewSummary:review,cached:false};cache.set(hash,{result:final,at:Date.now()});return {food:final,cached:false};}
