@@ -15,6 +15,13 @@
       "when": 1787052206938,
       "tag": "0001_supreme_bastion",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793254610226,
+      "tag": "0002_simplified_nutrient_tracking",
+      "breakpoints": true
     }
   ]
 }

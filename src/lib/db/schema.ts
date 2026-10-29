@@ -42,6 +42,14 @@ export const healthProfiles = sqliteTable('health_profiles', {
   notes: text('notes'),
 });
 
+export const nutrientTargets = sqliteTable('nutrient_targets', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+  targets: text('targets', { mode: 'json' }).$type<Record<string, number>>().notNull(),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+});
+
 // ── Foods ──────────────────────────────────────────────────────────
 
 export const foods = sqliteTable('foods', {
@@ -74,6 +82,8 @@ export const foods = sqliteTable('foods', {
   calciumMg: real('calcium_mg'),
   ironMg: real('iron_mg'),
   vitaminDMcg: real('vitamin_d_mcg'),
+  nutrientValues: text('nutrient_values', { mode: 'json' }).$type<Record<string, number>>(),
+  nutrientSource: text('nutrient_source'),
   deletedAt: text('deleted_at'),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 });
@@ -142,6 +152,8 @@ export const foodEntries = sqliteTable('food_entries', {
   fiberG: real('fiber_g'),
   sodiumMg: real('sodium_mg'),
   sugarG: real('sugar_g'),
+  nutrientValues: text('nutrient_values', { mode: 'json' }).$type<Record<string, number>>(),
+  nutrientSource: text('nutrient_source'),
 });
 
 // ── Exercises (child of diary entry) ───────────────────────────────
