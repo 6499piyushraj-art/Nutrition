@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto';
 
+// Current text+vision-capable Gemini API model IDs; keep seven defaults for fallback.
 export const GEMINI_JURY_MODELS = [
   'gemini-3.8-flash',
-  'gemini-3.7-flash',
   'gemini-3.6-flash',
-  'gemini-3.5-flash',
   'gemini-3.5-flash-lite',
-  'gemini-3.1-flash-lite',
+  'gemini-3.1-pro-preview',
+  'gemini-3-flash-preview',
   'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
 ] as const;
 
 type JsonObject = Record<string, unknown>;
@@ -25,6 +26,15 @@ const cache = new Map<string, { result: JsonObject; at: number }>();
 
 function splitValues(value: string | undefined): string[] {
   return (value || '').split(',').flatMap((part) => part.split(';')).flatMap((part) => part.split(String.fromCharCode(10)));
+}
+
+function positiveIntEnv(name: string, fallback: number, max: number): number {
+  const parsed = Number.parseInt(process.env[name] || '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, max) : fallback;
+}
+
+function cacheTtlMs(): number {
+  return positiveIntEnv('GEMINI_CACHE_TTL_DAYS', 30, 365) * 24 * 60 * 60 * 1000;
 }
 
 function keys(): string[] {
@@ -139,47 +149,50 @@ async function callGemini(
   if (availableModels.length === 0) throw new Error('No Gemini models configured');
 
   let lastError = 'Gemini request failed';
-  for (let attempt = 0; attempt < availableModels.length; attempt += 1) {
-    const model = availableModels[(offset + attempt) % availableModels.length];
-    const apiKey = apiKeys[(offset + attempt) % apiKeys.length];
-    try {
-      const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/' +
-          encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey),
-        {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          signal: AbortSignal.timeout(18000),
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ parts }],
-            generationConfig: {
-              temperature: 0.15,
-              maxOutputTokens: 1600,
-              responseMimeType: 'application/json',
-            },
-          }),
-        },
-      );
+  // Try every configured key for a model before advancing to the next model.
+  for (let modelOffset = 0; modelOffset < availableModels.length; modelOffset += 1) {
+    const model = availableModels[(offset + modelOffset) % availableModels.length];
+    for (let keyOffset = 0; keyOffset < apiKeys.length; keyOffset += 1) {
+      const apiKey = apiKeys[(offset + keyOffset) % apiKeys.length];
+      try {
+        const response = await fetch(
+          'https://generativelanguage.googleapis.com/v1beta/models/' +
+            encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey),
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            signal: AbortSignal.timeout(12000),
+            body: JSON.stringify({
+              system_instruction: { parts: [{ text: systemPrompt }] },
+              contents: [{ parts }],
+              generationConfig: {
+                temperature: 0.15,
+                maxOutputTokens: 1600,
+                responseMimeType: 'application/json',
+              },
+            }),
+          },
+        );
 
-      if (!response.ok) {
-        const detail = await response.json().catch(() => null) as { error?: { message?: string } } | null;
-        lastError = model + ' returned HTTP ' + response.status +
-          (detail?.error?.message ? ': ' + detail.error.message : '');
-        continue;
-      }
+        if (!response.ok) {
+          const detail = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+          lastError = model + ' returned HTTP ' + response.status +
+            (detail?.error?.message ? ': ' + detail.error.message : '');
+          continue;
+        }
 
-      const data = await response.json() as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      };
-      const output = data.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('').trim();
-      if (!output) {
-        lastError = model + ' returned no text';
-        continue;
+        const data = await response.json() as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }>;
+        };
+        const output = data.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('').trim();
+        if (!output) {
+          lastError = model + ' returned no text';
+          continue;
+        }
+        return { model, json: parseJsonObject(output) };
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : model + ' failed';
       }
-      return { model, json: parseJsonObject(output) };
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : model + ' failed';
     }
   }
   throw new Error(lastError);
@@ -211,7 +224,7 @@ export async function runGeminiNutritionJury(
   ])).digest('hex');
 
   const prior = cache.get(hash);
-  if (prior && Date.now() - prior.at < 30 * 24 * 60 * 60 * 1000) {
+  if (prior && Date.now() - prior.at < cacheTtlMs()) {
     return {
       food: {
         ...prior.result,
@@ -236,7 +249,9 @@ export async function runGeminiNutritionJury(
     'Independently estimate all values and identify uncertainty.',
   ];
 
-  const estimators = await Promise.all(roles.map(async (role, index) => {
+  const estimatorCount = Math.max(2, positiveIntEnv('GEMINI_JURY_ESTIMATORS', 5, roles.length));
+  const activeRoles = roles.slice(0, estimatorCount);
+  const estimators = await Promise.all(activeRoles.map(async (role, index) => {
     try {
       const candidate = await callGemini(
         [...parts, { text: 'Estimator role: ' + role + ' Do not see or rely on other estimates.' }],
@@ -272,7 +287,7 @@ export async function runGeminiNutritionJury(
         },
       ],
       NUTRITION_PROMPT + ' You are also the independent judge; inspect estimates critically and select plausible values.',
-      5,
+      activeRoles.length,
     );
     finalSource = judge.json;
     judgeModel = judge.model;
