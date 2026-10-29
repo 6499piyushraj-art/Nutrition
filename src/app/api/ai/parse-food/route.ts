@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { getProvider } from '@/lib/ai-providers';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { searchUSDA, type StrippedFood } from '@/lib/usda';
 
 const AI_DAILY_LIMIT = 50;
 const AI_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -28,6 +29,12 @@ Return ONLY valid JSON with these fields:
   "sugar_g": number or null,
   "sodium_mg": number or null,
   "cholesterol_mg": number or null,
+  "items": [
+    {
+      "name": "concise canonical English food name for matching in a food-composition database",
+      "amount_g": total grams of this food in the entire log, or null if not reasonably known
+    }
+  ],
   "nutrient_values": {
     "omega3": number or null,
     "calcium": number or null,
@@ -46,6 +53,8 @@ Return ONLY valid JSON with these fields:
 Rules:
 - These values are estimates for the TOTAL amount in the complete log; combine all listed foods and quantities.
 - For homemade food, use typical cooked Indian food values and reasonable portions. Do not treat a katori or roti as 1 gram.
+- In items, list each distinct food actually included in this log (maximum 8); translate Hindi/Hinglish food names into a simple English database lookup name, while preserving the user's wording in description. Include the total gram amount eaten for that item when it can be reasonably estimated. For liquids, estimate the equivalent grams from the stated volume; never include serving quantities in the item name.
+- The items list is used to look up measured food-composition data. Do not add ingredients the user did not mention. If a multi-food log has uncertain portion sizes, use null rather than inventing an exact weight.
 - For nutrition labels or nutrition data explicitly supplied in the user's text/image, extract only values that are actually shown. Do not calculate missing micronutrients.
 - The fields in nutrient_values are NOT general AI estimates. Fill them only when the supplied label/table/text explicitly gives their values. For ordinary food descriptions or a food photo without quantified nutrition information, return null for every nutrient_values field.
 - Never use 0 to mean unknown. Keep unavailable values null. Do not infer micronutrients from memory or invent precision.
@@ -53,6 +62,135 @@ Rules:
 - Set nutrient_source to "User-provided nutrition label/data" only when extracting explicitly supplied nutrition information; otherwise return null.
 - Do NOT include tags; the user manages tags manually.
 - Return ONLY the JSON object, no markdown fences and no explanation.`;
+
+
+const SELECTED_MICRONUTRIENTS = [
+  'omega3', 'calcium', 'iron', 'zinc', 'vitamin_d',
+  'b12', 'folate', 'vitamin_c', 'vitamin_a', 'iodine',
+] as const;
+
+type FoodComponent = { name: string; amount_g: number | null };
+
+function finiteNonNegative(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function cleanFoodQuery(value: string): string {
+  return value
+    .replace(/\\b\\d+(?:[.,]\\d+)?\\s*(?:kg|kgs|g|gram(?:s)?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?|cups?|glasses?|katoris?|bowls?|pieces?|slices?)\\b/gi, ' ')
+    .replace(/\\b\\d+(?:[.,]\\d+)?\\s*x\\s*/gi, ' ')
+    .replace(/[()[\\]{}]/g, ' ')
+    .replace(/\\s+/g, ' ')
+    .trim();
+}
+
+function amountFromServing(size: unknown, unitValue: unknown): number | null {
+  const sizeNumber = finiteNonNegative(size);
+  if (sizeNumber === null || sizeNumber <= 0) return null;
+  const unit = typeof unitValue === 'string' ? unitValue.toLowerCase().trim() : '';
+  if (/^(kg|kilograms?)$/.test(unit)) return sizeNumber * 1000;
+  if (/^(g|gram|grams)$/.test(unit)) return sizeNumber;
+  if (/^(ml|millilit(?:er|re)s?)$/.test(unit)) return sizeNumber;
+  return null;
+}
+
+function parseComponents(rawItems: unknown, rawFood: Record<string, unknown>): FoodComponent[] {
+  if (Array.isArray(rawItems)) {
+    const parsed = rawItems.slice(0, 8).map((entry) => {
+      if (!entry || typeof entry !== 'object') return null;
+      const row = entry as Record<string, unknown>;
+      const name = typeof row.name === 'string' ? cleanFoodQuery(row.name) : '';
+      const amount = finiteNonNegative(row.amount_g);
+      if (!name || name.length < 2) return null;
+      return { name, amount_g: amount !== null && amount > 0 && amount <= 10000 ? amount : null };
+    }).filter((item): item is FoodComponent => item !== null);
+    if (parsed.length) {
+      if (parsed.length === 1 && parsed[0].amount_g === null) {
+        parsed[0].amount_g = amountFromServing(rawFood.default_serving_size, rawFood.default_serving_unit);
+      }
+      return parsed;
+    }
+  }
+
+  // Backward-compatible fallback: only look up a clearly single-food description.
+  const description = typeof rawFood.description === 'string' ? rawFood.description : '';
+  if (!description || /[,;+]|\\b(?:and|with|plus|aur|or)\\b/i.test(description)) return [];
+  const name = cleanFoodQuery(description);
+  const amount = amountFromServing(rawFood.default_serving_size, rawFood.default_serving_unit);
+  return name ? [{ name, amount_g: amount }] : [];
+}
+
+function candidateScore(query: string, food: StrippedFood): number {
+  const normalizeTokens = (text: string) => cleanFoodQuery(text.toLowerCase())
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .split(/\\s+/)
+    .filter((token) => token.length > 1 && !['and', 'with', 'raw', 'fresh', 'food'].includes(token));
+  const queryTokens = Array.from(new Set(normalizeTokens(query)));
+  const foodTokens = new Set(normalizeTokens(food.description));
+  const matches = queryTokens.filter((token) => foodTokens.has(token)).length;
+  const relevance = queryTokens.length ? matches / queryTokens.length : 0;
+  const coverage = SELECTED_MICRONUTRIENTS.filter((key) => {
+    const value = food.nutrient_values?.[key];
+    return typeof value === 'number' && Number.isFinite(value);
+  }).length;
+  const type = food.data_type.toLowerCase();
+  const typeBonus = type.includes('sr legacy') ? 0.6 : type.includes('foundation') ? 0.5 : type.includes('fndds') ? 0.3 : 0;
+  return relevance * 10 + coverage * 0.25 + typeBonus;
+}
+
+async function lookupFoodMicronutrients(components: FoodComponent[]): Promise<{
+  values: Record<string, number>;
+  sources: string[];
+}> {
+  const totals: Record<string, number> = {};
+  const covered = Object.fromEntries(SELECTED_MICRONUTRIENTS.map((key) => [key, true])) as Record<(typeof SELECTED_MICRONUTRIENTS)[number], boolean>;
+  const sources = new Set<string>();
+
+  if (!components.length || components.length > 8 || components.some((item) => item.amount_g === null || item.amount_g <= 0)) {
+    return { values: {}, sources: [] };
+  }
+
+  const matches = await Promise.all(components.map(async (component) => {
+    try {
+      const result = await searchUSDA(component.name, 8, ['Foundation', 'SR Legacy', 'Survey (FNDDS)']);
+      const candidates = result.results
+        .filter((food) => SELECTED_MICRONUTRIENTS.some((key) => typeof food.nutrient_values?.[key] === 'number'))
+        .sort((a, b) => candidateScore(component.name, b) - candidateScore(component.name, a));
+      const best = candidates[0];
+      if (!best || candidateScore(component.name, best) < 5) return null;
+      return { component, food: best };
+    } catch {
+      // Optional database enrichment must not block the food log.
+      return null;
+    }
+  }));
+
+  for (let index = 0; index < components.length; index++) {
+    const match = matches[index];
+    if (!match) {
+      for (const key of SELECTED_MICRONUTRIENTS) covered[key] = false;
+      continue;
+    }
+    sources.add(match.food.data_type || 'FoodData Central');
+    const factor = (match.component.amount_g as number) / 100;
+    for (const key of SELECTED_MICRONUTRIENTS) {
+      const value = finiteNonNegative(match.food.nutrient_values?.[key]);
+      if (value === null) {
+        covered[key] = false;
+      } else {
+        totals[key] = (totals[key] || 0) + value * factor;
+      }
+    }
+  }
+
+  const values: Record<string, number> = {};
+  for (const key of SELECTED_MICRONUTRIENTS) {
+    if (covered[key] && typeof totals[key] === 'number') {
+      values[key] = Math.round(totals[key] * 1000) / 1000;
+    }
+  }
+  return { values, sources: Array.from(sources) };
+}
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -109,15 +247,32 @@ export async function POST(request: Request) {
     const rawNutrients = rawFood.nutrient_values && typeof rawFood.nutrient_values === 'object' && !Array.isArray(rawFood.nutrient_values)
       ? rawFood.nutrient_values as Record<string, unknown>
       : {};
-    const nutrientKeys = ['omega3', 'calcium', 'iron', 'zinc', 'vitamin_d', 'b12', 'folate', 'vitamin_c', 'vitamin_a', 'iodine'];
-    const nutrientValues = Object.fromEntries(nutrientKeys.map((key) => {
-      const value = rawNutrients[key];
-      return [key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null];
-    }));
-    const nutrientSource = typeof rawFood.nutrient_source === 'string' && rawFood.nutrient_source.trim()
+    const explicitValues: Record<string, number> = {};
+    for (const key of SELECTED_MICRONUTRIENTS) {
+      const value = finiteNonNegative(rawNutrients[key]);
+      if (value !== null) explicitValues[key] = value;
+    }
+
+    let databaseValues: Record<string, number> = {};
+    let databaseSources: string[] = [];
+    const components = type === 'text' ? parseComponents(rawFood.items, rawFood) : [];
+    if (components.length) {
+      const result = await lookupFoodMicronutrients(components);
+      databaseValues = result.values;
+      databaseSources = result.sources;
+    }
+
+    // Values explicitly read from the user's label take precedence over generic food matches.
+    const finalNutrients = { ...databaseValues, ...explicitValues };
+    const explicitSource = typeof rawFood.nutrient_source === 'string' && rawFood.nutrient_source.trim()
       ? rawFood.nutrient_source.trim()
       : null;
-    return NextResponse.json({ food: { ...rawFood, nutrient_values: nutrientValues, nutrient_source: nutrientSource } });
+    const nutrientSource = databaseSources.length
+      ? `USDA FoodData Central (${databaseSources.join(', ')}) for available micronutrients; Gemini estimate for macros/portions${explicitSource ? `; supplied label values also used (${explicitSource})` : ''}`
+      : explicitSource;
+    return NextResponse.json({
+      food: { ...rawFood, nutrient_values: finalNutrients, nutrient_source: nutrientSource },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     if (message.includes('No AI provider')) {

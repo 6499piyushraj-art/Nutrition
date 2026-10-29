@@ -200,7 +200,7 @@ function AddFoodForm() {
             </section>
             <section>
               <h3 className="mb-1 font-semibold text-gray-800">Essential Micronutrients</h3>
-              <p className="mb-3 text-xs text-gray-500">Micronutrients are shown when they are present in the nutrition label/data you supplied. Missing values stay unavailable; AI does not guess them.</p>
+              <p className="mb-3 text-xs text-gray-500">Micronutrients are looked up from food-composition data when a food match is available. Portion weights may be estimated; values the database does not report stay unavailable.</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {[
                   { key: 'calcium', label: 'Calcium', unit: 'mg' },

@@ -30,7 +30,7 @@ export interface SearchResult {
 const FDC_MICRONUTRIENT_MAP: Record<number, { key: string; factor: number }> = {
   1087: { key: 'calcium', factor: 1 }, 1089: { key: 'iron', factor: 1 },
   1095: { key: 'zinc', factor: 1 }, 1114: { key: 'vitamin_d', factor: 1 },
-  1178: { key: 'b12', factor: 1 }, 1177: { key: 'folate', factor: 1 },
+  1178: { key: 'b12', factor: 1 }, 1177: { key: 'folate', factor: 1 }, 1186: { key: 'folate', factor: 1 },
   1162: { key: 'vitamin_c', factor: 1 }, 1106: { key: 'vitamin_a', factor: 1 },
   1100: { key: 'iodine', factor: 1 }, 1091: { key: 'phosphorus', factor: 1 },
   1090: { key: 'magnesium', factor: 1 }, 1092: { key: 'potassium', factor: 1 },
@@ -96,6 +96,7 @@ export async function searchUSDA(query: string, limit = 10, dataTypes?: string[]
       pageSize: Math.min(limit, 25),
       dataType: types,
     }),
+    signal: AbortSignal.timeout(5000),
   });
 
   if (!res.ok) {
