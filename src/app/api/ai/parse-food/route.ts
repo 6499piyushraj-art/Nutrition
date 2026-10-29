@@ -11,7 +11,7 @@ const NUTRIENT_KEYS = [
   'b12', 'folate', 'vitamin_c', 'vitamin_a', 'iodine',
 ] as const;
 
-const SYSTEM_PROMPT = \`You are MyNutri AI, a careful nutrition estimator. Use your own Gemini nutrition knowledge to estimate ALL nutrition for the foods the user logs. Do not call or claim to have used USDA, IFCT, Open Food Facts, another database, or another AI provider. Every value in the response must come from Gemini's estimate or from a label/image the user supplied.
+const SYSTEM_PROMPT = `You are MyNutri AI, a careful nutrition estimator. Use your own Gemini nutrition knowledge to estimate ALL nutrition for the foods the user logs. Do not call or claim to have used USDA, IFCT, Open Food Facts, another database, or another AI provider. Every value in the response must come from Gemini's estimate or from a label/image the user supplied.
 
 The user may write Hindi, Hinglish, or English and may list one or multiple foods with amounts. Understand Indian home foods, e.g. doodh/milk, dahi/curd, roti/chapati, dal, chawal/rice, sabzi, poha, idli, dosa, egg/anda, banana/kela, paneer, nuts and chai. Preserve the user's food wording in the description.
 
@@ -63,14 +63,14 @@ Critical nutrient rules:
 - Keep quantities and units internally consistent. Do not return negative values, strings such as "trace", percent daily values, or units inside numeric fields.
 - Keep the macro estimate and micronutrient estimate consistent with the same food and portion.
 - Do not add foods or ingredients the user did not mention.
-- Return valid JSON only, with no markdown fences, comments, or explanation.\`;
+- Return valid JSON only, with no markdown fences, comments, or explanation.`;
 
-const MICRONUTRIENT_COMPLETION_PROMPT = \`You are Gemini powering MyNutri AI. Estimate only from your own food-composition knowledge and the user's supplied food description; do not use or claim an external database. Complete all ten selected nutrient estimates for the ENTIRE described portion. These are the units: omega3 g; calcium, iron, zinc, vitamin_c mg; vitamin_d, b12, folate, vitamin_a, iodine µg. For common identifiable foods, do not leave values null merely because a label is absent; use a reasonable estimate. For plain cow milk, calcium should be approximately 110-125 mg per 100 g. Use 0 when the food reasonably contains effectively none; use null only if genuinely impossible to estimate. Do not invent foods. Return only JSON in this shape: {"nutrient_values":{"omega3":number|null,"calcium":number|null,"iron":number|null,"zinc":number|null,"vitamin_d":number|null,"b12":number|null,"folate":number|null,"vitamin_c":number|null,"vitamin_a":number|null,"iodine":number|null}}.\`;
+const MICRONUTRIENT_COMPLETION_PROMPT = `You are Gemini powering MyNutri AI. Estimate only from your own food-composition knowledge and the user's supplied food description; do not use or claim an external database. Complete all ten selected nutrient estimates for the ENTIRE described portion. These are the units: omega3 g; calcium, iron, zinc, vitamin_c mg; vitamin_d, b12, folate, vitamin_a, iodine µg. For common identifiable foods, do not leave values null merely because a label is absent; use a reasonable estimate. For plain cow milk, calcium should be approximately 110-125 mg per 100 g. Use 0 when the food reasonably contains effectively none; use null only if genuinely impossible to estimate. Do not invent foods. Return only JSON in this shape: {"nutrient_values":{"omega3":number|null,"calcium":number|null,"iron":number|null,"zinc":number|null,"vitamin_d":number|null,"b12":number|null,"folate":number|null,"vitamin_c":number|null,"vitamin_a":number|null,"iodine":number|null}}.`;
 
 function parseJsonObject(text: string): Record<string, unknown> {
   let cleaned = text.trim();
-  if (cleaned.startsWith('\`\`\`')) {
-    cleaned = cleaned.replace(/^\`\`\`(?:json)?\n?/, '').replace(/\n?\`\`\`$/, '');
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
   }
   const parsed: unknown = JSON.parse(cleaned);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -102,11 +102,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const { allowed, retryAfterMs } = checkRateLimit(\`ai:\${session.user.id}\`, AI_DAILY_LIMIT, AI_WINDOW_MS);
+  const { allowed, retryAfterMs } = checkRateLimit(`ai:${session.user.id}`, AI_DAILY_LIMIT, AI_WINDOW_MS);
   if (!allowed) {
     const hours = Math.ceil(retryAfterMs / (1000 * 60 * 60));
     return NextResponse.json(
-      { error: \`Daily Gemini limit reached (\${AI_DAILY_LIMIT} requests). Try again in ~\${hours} hour\${hours > 1 ? 's' : ''}.\` },
+      { error: `Daily Gemini limit reached (${AI_DAILY_LIMIT} requests). Try again in ~${hours} hour${hours > 1 ? 's' : ''}.` },
       { status: 429, headers: { 'Retry-After': String(Math.ceil(retryAfterMs / 1000)) } },
     );
   }
