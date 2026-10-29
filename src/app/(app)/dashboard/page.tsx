@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Settings, BookOpen, Plus } from 'lucide-react';
 import LogWeightButton from '@/components/dashboard/LogWeightButton';
+import NutrientTracker from '@/components/dashboard/NutrientTracker';
 
 interface DashboardData {
   user: { first_name: string | null; last_name: string | null };
@@ -15,26 +16,6 @@ interface DashboardData {
   } | null;
   totals: { calories: number; protein: number; carbs: number; fat: number };
   hasProfile: boolean;
-}
-
-function ProgressRing({ value, max, label, unit, color }: { value: number; max: number; label: string; unit: string; color: string }) {
-  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
-  return (
-    <div className="text-center">
-      <div className="relative w-16 h-16 mx-auto">
-        <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36">
-          <circle cx="18" cy="18" r="15.5" fill="none" stroke="#e5e7eb" strokeWidth="3" />
-          <circle cx="18" cy="18" r="15.5" fill="none" stroke={color} strokeWidth="3"
-            strokeDasharray={`${pct} 100`} strokeLinecap="round" />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-xs font-bold text-gray-900">{Math.round(value)}</span>
-        </div>
-      </div>
-      <p className="text-[10px] text-gray-500 mt-1">{label}</p>
-      <p className="text-[10px] text-gray-400">/ {max}{unit}</p>
-    </div>
-  );
 }
 
 export default function DashboardPage() {
@@ -110,14 +91,6 @@ export default function DashboardPage() {
     );
   }
 
-  const calGoal = data.profile?.daily_calorie_goal || 2000;
-  const proGoal = data.profile?.goal_protein_g || 150;
-  const carbGoal = data.profile?.goal_carbs_g || 250;
-  const fatGoal = data.profile?.goal_fat_g || 65;
-
-  const calPct = Math.min((data.totals.calories / calGoal) * 100, 100);
-  const calRemaining = Math.max(calGoal - data.totals.calories, 0);
-
   return (
     <div>
       {/* Header */}
@@ -138,36 +111,7 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* Calorie hero card */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-gray-800">Today&apos;s Calories</h2>
-          <span className="text-sm text-gray-500">{Math.round(data.totals.calories)} / {calGoal}</span>
-        </div>
-        <div className="w-full h-4 bg-gray-100 rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${calPct}%`,
-              backgroundColor: calPct > 100 ? '#ef4444' : calPct > 80 ? '#f59e0b' : '#2EA96B',
-            }}
-          />
-        </div>
-        <p className="text-center mt-3">
-          <span className="text-2xl font-bold text-gray-900">{Math.round(calRemaining)}</span>
-          <span className="text-sm text-gray-500 ml-1">cal remaining</span>
-        </p>
-      </div>
-
-      {/* Macro rings */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-        <h2 className="font-semibold text-gray-800 mb-4">Macros</h2>
-        <div className="flex justify-around">
-          <ProgressRing value={data.totals.protein} max={proGoal} label="Protein" unit="g" color="#3b82f6" />
-          <ProgressRing value={data.totals.carbs} max={carbGoal} label="Carbs" unit="g" color="#22c55e" />
-          <ProgressRing value={data.totals.fat} max={fatGoal} label="Fat" unit="g" color="#a855f7" />
-        </div>
-      </div>
+      <NutrientTracker />
 
       {/* Quick actions */}
       <div className="grid grid-cols-3 gap-3">

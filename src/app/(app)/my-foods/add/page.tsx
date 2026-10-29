@@ -74,12 +74,16 @@ export default function AddFoodPage() {
     cholesterol_mg: '',
   });
   const [formTags, setFormTags] = useState<string[]>([]);
+  const [nutrientValues, setNutrientValues] = useState<Record<string, number> | null>(null);
+  const [nutrientSource, setNutrientSource] = useState<string | null>(null);
 
   function updateForm(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   function populateFromParsed(food: ParsedFood) {
+    setNutrientValues(null);
+    setNutrientSource(null);
     setFormTags([]); // AI no longer suggests tags — user picks their own
     setForm({
       description: food.description || '',
@@ -107,17 +111,19 @@ export default function AddFoodPage() {
       barcode: food.upc,
       default_serving_size: food.serving_size?.toString() || '',
       default_serving_unit: food.serving_unit || 'g',
-      energy_kcal: food.calories.toString(),
-      protein_g: food.protein_g.toString(),
-      fat_g: food.fat_g.toString(),
+      energy_kcal: food.calories?.toString() || '',
+      protein_g: food.protein_g?.toString() || '',
+      fat_g: food.fat_g?.toString() || '',
       saturated_fat_g: '',
-      carbs_g: food.carbs_g.toString(),
-      fiber_g: food.fiber_g.toString(),
-      sugar_g: food.sugar_g.toString(),
-      sodium_mg: food.sodium_mg.toString(),
+      carbs_g: food.carbs_g?.toString() || '',
+      fiber_g: food.fiber_g?.toString() || '',
+      sugar_g: food.sugar_g?.toString() || '',
+      sodium_mg: food.sodium_mg?.toString() || '',
       cholesterol_mg: '',
     });
     setFormTags([]);
+    setNutrientValues(food.nutrient_values || null);
+    setNutrientSource(food.nutrient_source || null);
     setMode('manual');
   }
 
@@ -305,8 +311,10 @@ export default function AddFoodPage() {
           sugar_g: form.sugar_g ? parseFloat(form.sugar_g) : null,
           sodium_mg: form.sodium_mg ? parseFloat(form.sodium_mg) : null,
           cholesterol_mg: form.cholesterol_mg ? parseFloat(form.cholesterol_mg) : null,
+          nutrient_values: nutrientValues,
+          nutrient_source: nutrientSource,
           tag_ids: formTags,
-          source: form.barcode ? 'usda' : 'manual',
+          source: nutrientValues ? 'usda_fdc' : form.barcode ? 'usda' : 'manual',
         }),
       });
       if (!res.ok) {

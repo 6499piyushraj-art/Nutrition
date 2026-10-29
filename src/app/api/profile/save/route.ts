@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { eq } from 'drizzle-orm';
+import { getDefaultNutrientTargets } from '@/lib/nutrients';
 
 // Map snake_case request fields to camelCase schema field names
 const snakeToCamelMap: Record<string, string> = {
@@ -84,6 +85,26 @@ export async function POST(request: Request) {
         })
         .returning()
         .get();
+    }
+
+    const savedProfile = await db.select().from(schema.healthProfiles)
+      .where(eq(schema.healthProfiles.userId, session.user.id)).get();
+    const previousTargets = await db.select().from(schema.nutrientTargets)
+      .where(eq(schema.nutrientTargets.userId, session.user.id)).get();
+    const targets = { ...getDefaultNutrientTargets(savedProfile), ...(previousTargets?.targets || {}) };
+    if (savedProfile) {
+      targets.calories = savedProfile.dailyCalorieGoal ?? targets.calories;
+      targets.protein = savedProfile.goalProteinG ?? targets.protein;
+      targets.carbs = savedProfile.goalCarbsG ?? targets.carbs;
+      targets.fat = savedProfile.goalFatG ?? targets.fat;
+      targets.fiber = savedProfile.goalFiberG ?? targets.fiber;
+      targets.sodium = savedProfile.goalSodiumMg ?? targets.sodium;
+    }
+    if (previousTargets) {
+      await db.update(schema.nutrientTargets).set({ targets, updatedAt: new Date().toISOString() })
+        .where(eq(schema.nutrientTargets.userId, session.user.id)).run();
+    } else {
+      await db.insert(schema.nutrientTargets).values({ userId: session.user.id, targets }).run();
     }
 
     // Convert response back to snake_case

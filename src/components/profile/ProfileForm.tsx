@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Save } from 'lucide-react';
 
 interface ProfileData {
@@ -49,10 +49,10 @@ export default function ProfileForm({ profile, userId, userEmail, userName }: Pr
     goal_target_date: profile?.goal_target_date || '',
     activity_level: profile?.activity_level || 'sedentary',
     weekly_goal: profile?.weekly_goal || 'Lose 1 lb per week',
-    daily_calorie_goal: profile?.daily_calorie_goal?.toString() || '2000',
-    goal_protein_g: profile?.goal_protein_g?.toString() || '150',
-    goal_carbs_g: profile?.goal_carbs_g?.toString() || '250',
-    goal_fat_g: profile?.goal_fat_g?.toString() || '65',
+    daily_calorie_goal: profile?.daily_calorie_goal?.toString() || '2400',
+    goal_protein_g: profile?.goal_protein_g?.toString() || '80',
+    goal_carbs_g: profile?.goal_carbs_g?.toString() || '300',
+    goal_fat_g: profile?.goal_fat_g?.toString() || '75',
     goal_fiber_g: profile?.goal_fiber_g?.toString() || '30',
     goal_sodium_mg: profile?.goal_sodium_mg?.toString() || '2300',
     goal_sugar_g: profile?.goal_sugar_g?.toString() || '50',
@@ -60,6 +60,27 @@ export default function ProfileForm({ profile, userId, userEmail, userName }: Pr
     daily_step_goal: profile?.daily_step_goal?.toString() || '10000',
     unit_system: profile?.unit_system || 'imperial',
   });
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/nutrients?_t=' + Date.now(), { cache: 'no-store' })
+      .then(async (res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!active || !data?.targets) return;
+        const targets = data.targets as Record<string, number>;
+        setForm((prev) => ({
+          ...prev,
+          daily_calorie_goal: String(targets.calories ?? prev.daily_calorie_goal),
+          goal_protein_g: String(targets.protein ?? prev.goal_protein_g),
+          goal_carbs_g: String(targets.carbs ?? prev.goal_carbs_g),
+          goal_fat_g: String(targets.fat ?? prev.goal_fat_g),
+          goal_fiber_g: String(targets.fiber ?? prev.goal_fiber_g),
+          goal_sodium_mg: String(targets.sodium ?? prev.goal_sodium_mg),
+        }));
+      })
+      .catch(() => { /* Keep existing profile values if offline. */ });
+    return () => { active = false; };
+  }, []);
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
