@@ -175,9 +175,9 @@ export default function DashboardPage() {
           <BookOpen size={24} className="text-brand-600 mb-1" />
           <span className="text-sm font-medium text-gray-700">Food Diary</span>
         </Link>
-        <Link href="/my-foods/add" className="bg-white rounded-xl p-4 shadow-sm text-center active:bg-gray-50 min-h-[72px] flex flex-col items-center justify-center">
+        <Link href="/diary/add-food" className="bg-white rounded-xl p-4 shadow-sm text-center active:bg-gray-50 min-h-[72px] flex flex-col items-center justify-center">
           <Plus size={24} className="text-brand-600 mb-1" />
-          <span className="text-sm font-medium text-gray-700">Add Food</span>
+          <span className="text-sm font-medium text-gray-700">Log Food</span>
         </Link>
         <LogWeightButton />
       </div>
