@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 
-// Current text+vision-capable Gemini API model IDs; keep seven defaults for fallback.
+// Seven text+image-capable Gemini API models, ordered by preferred fallback.
 export const GEMINI_JURY_MODELS = [
   'gemini-3.8-flash',
   'gemini-3.6-flash',
   'gemini-3.5-flash-lite',
-  'gemini-3.1-pro-preview',
+  'gemini-3.1-flash-lite',
   'gemini-3-flash-preview',
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
@@ -157,10 +157,13 @@ async function callGemini(
       try {
         const response = await fetch(
           'https://generativelanguage.googleapis.com/v1beta/models/' +
-            encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey),
+            encodeURIComponent(model) + ':generateContent',
           {
             method: 'POST',
-            headers: { 'content-type': 'application/json' },
+            headers: {
+              'content-type': 'application/json',
+              'x-goog-api-key': apiKey,
+            },
             signal: AbortSignal.timeout(12000),
             body: JSON.stringify({
               system_instruction: { parts: [{ text: systemPrompt }] },
