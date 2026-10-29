@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { eq } from 'drizzle-orm';
-import { getDefaultNutrientTargets } from '@/lib/nutrients';
+import { getDefaultNutrientTargets, NUTRIENT_SPECS } from '@/lib/nutrients';
 
 // Map snake_case request fields to camelCase schema field names
 const snakeToCamelMap: Record<string, string> = {
@@ -91,14 +91,20 @@ export async function POST(request: Request) {
       .where(eq(schema.healthProfiles.userId, session.user.id)).get();
     const previousTargets = await db.select().from(schema.nutrientTargets)
       .where(eq(schema.nutrientTargets.userId, session.user.id)).get();
-    const targets = { ...getDefaultNutrientTargets(savedProfile), ...(previousTargets?.targets || {}) };
+    const defaultTargets = getDefaultNutrientTargets(savedProfile);
+    const storedTargets = previousTargets?.targets && typeof previousTargets.targets === 'object' && !Array.isArray(previousTargets.targets)
+      ? previousTargets.targets as Record<string, unknown>
+      : {};
+    const targets = Object.fromEntries(NUTRIENT_SPECS.map((spec) => {
+      const value = storedTargets[spec.key];
+      return [spec.key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaultTargets[spec.key]];
+    })) as ReturnType<typeof getDefaultNutrientTargets>;
     if (savedProfile) {
       targets.calories = savedProfile.dailyCalorieGoal ?? targets.calories;
       targets.protein = savedProfile.goalProteinG ?? targets.protein;
       targets.carbs = savedProfile.goalCarbsG ?? targets.carbs;
       targets.fat = savedProfile.goalFatG ?? targets.fat;
       targets.fiber = savedProfile.goalFiberG ?? targets.fiber;
-      targets.sodium = savedProfile.goalSodiumMg ?? targets.sodium;
     }
     if (previousTargets) {
       await db.update(schema.nutrientTargets).set({ targets, updatedAt: new Date().toISOString() })
