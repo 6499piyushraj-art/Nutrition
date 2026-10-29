@@ -95,10 +95,6 @@ function cleanFoodQuery(value: string): string {
     .trim();
 }
 
-function finiteNonNegative(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
-}
-
 function amountFromServing(size: unknown, unitValue: unknown): number | null {
   const sizeNumber = finiteNonNegative(size);
   if (sizeNumber === null || sizeNumber <= 0) return null;
