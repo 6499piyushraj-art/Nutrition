@@ -182,7 +182,7 @@ async function callGemini(
         }
 
         const data = await response.json() as {
-          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }>;
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
         };
         const output = data.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('').trim();
         if (!output) {
