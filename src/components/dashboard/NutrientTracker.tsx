@@ -75,7 +75,7 @@ export default function NutrientTracker() {
       <div key={key} className="min-w-0 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
         <p className="text-xs font-medium text-gray-500">{spec.label}</p>
         <p className="mt-1 break-words text-lg font-bold text-gray-900">{valueText}</p>
-        <p className="mt-1 text-xs text-gray-400">{spec.isLimit ? 'Reference limit: ≤ ' + fmt(draft[key], spec.unit) : 'Target: ' + fmt(draft[key], spec.unit)}</p>
+        <p className="mt-1 text-xs text-gray-400">{('isLimit' in spec && spec.isLimit) ? 'Reference limit: ≤ ' + fmt(draft[key], spec.unit) : 'Target: ' + fmt(draft[key], spec.unit)}</p>
         {status === 'partial' && result && <p className="mt-1 text-xs text-amber-700">Incomplete data ({result.knownFoods}/{result.totalFoods} foods); daily total unavailable.</p>}
         {status === 'complete' && result && <p className="mt-1 text-[11px] text-gray-400">{confidenceLabel(result.confidence)}</p>}
       </div>
@@ -136,7 +136,7 @@ export default function NutrientTracker() {
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {NUTRIENT_SPECS.filter((spec) => spec.group === group).map((spec) => (
                       <label key={spec.key} className="block text-sm text-gray-700">
-                        <span className="flex items-baseline justify-between gap-2"><span className="font-medium">{spec.label}{spec.isLimit ? ' limit' : ''}</span><span className="text-xs text-gray-500">{spec.unit}</span></span>
+                        <span className="flex items-baseline justify-between gap-2"><span className="font-medium">{spec.label}{('isLimit' in spec && spec.isLimit) ? ' limit' : ''}</span><span className="text-xs text-gray-500">{spec.unit}</span></span>
                         <input type="number" min="0" step="any" required value={draft[spec.key as Key]}
                           onChange={(event) => { const value = event.target.value === '' ? 0 : Number(event.target.value); setDraft((prev) => ({ ...prev, [spec.key]: value })); setSaved(false); }}
                           className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
