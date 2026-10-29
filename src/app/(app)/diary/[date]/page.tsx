@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { MEAL_TYPES } from '@/lib/constants';
 import DiaryFoodEntry from '@/components/diary/DiaryFoodEntry';
 import DiaryDateNav from '@/components/diary/DiaryDateNav';
 import JournalSection from '@/components/diary/JournalSection';
@@ -46,21 +45,27 @@ export { type FoodEntryData };
 export default function DiaryDatePage() {
   const params = useParams();
   const date = params.date as string;
-
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     async function loadDiary() {
       setLoading(true);
+      setLoadError('');
       try {
-        const res = await fetch(`/api/diary/${date}?_t=${Date.now()}`);
-        if (res.ok) {
-          const data = await res.json();
-          setEntries(data.entries || []);
+        const res = await fetch('/api/diary/' + date + '?_t=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) {
+          if (res.status === 401) {
+            window.location.replace('/login?redirect=%2Fdiary');
+            return;
+          }
+          throw new Error('Could not load food log (' + res.status + ')');
         }
-      } catch {
-        // Silent
+        const data = await res.json();
+        setEntries(data.entries || []);
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : 'Please try again.');
       } finally {
         setLoading(false);
       }
@@ -68,40 +73,24 @@ export default function DiaryDatePage() {
     loadDiary();
   }, [date]);
 
-  // Merge entries for same meal — stamp each food entry with its parent diary entry ID
-  const entryMap = new Map<string, DiaryEntry>();
-  for (const e of entries) {
-    if (!e.diary_meal) continue;
-    // Tag each food entry with its actual diary entry ID
-    const taggedFoodEntries = e.food_entries.map((fe) => ({ ...fe, _diaryEntryId: e.id }));
-    const existing = entryMap.get(e.diary_meal);
-    if (existing) {
-      existing.food_entries = [...existing.food_entries, ...taggedFoodEntries];
-      existing.total_calories = (existing.total_calories || 0) + (e.total_calories || 0);
-      existing.total_protein_g = (existing.total_protein_g || 0) + (e.total_protein_g || 0);
-      existing.total_carbs_g = (existing.total_carbs_g || 0) + (e.total_carbs_g || 0);
-      existing.total_fat_g = (existing.total_fat_g || 0) + (e.total_fat_g || 0);
-    } else {
-      entryMap.set(e.diary_meal, { ...e, food_entries: taggedFoodEntries });
-    }
-  }
+  const allFoodEntries = entries.flatMap((entry) =>
+    entry.food_entries.map((foodEntry) => ({
+      foodEntry,
+      diaryEntryId: entry.id,
+    })),
+  );
 
-  let dayCal = 0, dayPro = 0, dayCarb = 0, dayFat = 0;
-  for (const e of entries) {
-    dayCal += e.total_calories || 0;
-    dayPro += e.total_protein_g || 0;
-    dayCarb += e.total_carbs_g || 0;
-    dayFat += e.total_fat_g || 0;
-  }
+  const dayCal = entries.reduce((sum, entry) => sum + (entry.total_calories || 0), 0);
+  const dayPro = entries.reduce((sum, entry) => sum + (entry.total_protein_g || 0), 0);
+  const dayCarb = entries.reduce((sum, entry) => sum + (entry.total_carbs_g || 0), 0);
+  const dayFat = entries.reduce((sum, entry) => sum + (entry.total_fat_g || 0), 0);
 
-  // Date navigation
-  const [year, month, day] = date.split('-').map(Number);
+  const parts = date.split('-').map(Number);
+  const year = parts[0], month = parts[1], day = parts[2];
   const d = new Date(year, month - 1, day);
   const prev = new Date(year, month - 1, day - 1);
   const next = new Date(year, month - 1, day + 1);
-  const fmt = (dt: Date) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-  const prevStr = fmt(prev);
-  const nextStr = fmt(next);
+  const fmt = (dt: Date) => String(dt.getFullYear()) + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
   const now = new Date();
   const todayStr = fmt(now);
   const isToday = date === todayStr;
@@ -110,14 +99,13 @@ export default function DiaryDatePage() {
     <div>
       <DiaryDateNav
         date={date}
-        prevDate={prevStr}
-        nextDate={nextStr}
+        prevDate={fmt(prev)}
+        nextDate={fmt(next)}
         isToday={isToday}
         displayLabel={isToday ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-        displayDate={`${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}/${year}`}
+        displayDate={String(month).padStart(2, '0') + '/' + String(day).padStart(2, '0') + '/' + year}
       />
 
-      {/* Day totals */}
       {dayCal > 0 && (
         <div className="grid grid-cols-4 gap-2 text-center mb-4">
           <div className="bg-orange-50 rounded-lg p-2">
@@ -139,45 +127,46 @@ export default function DiaryDatePage() {
         </div>
       )}
 
-      {loading ? (
-        <p className="text-center text-gray-500 py-8">Loading...</p>
-      ) : (
-        <div className="space-y-3">
-          {MEAL_TYPES.map((meal) => {
-            const entry = entryMap.get(meal);
-            const foodEntries = entry?.food_entries || [];
-            const mealCal = entry?.total_calories || 0;
-
-            return (
-              <div key={meal} className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                  <h2 className="font-semibold text-gray-800">{meal}</h2>
-                  {mealCal > 0 && (
-                    <span className="text-sm text-orange-600 font-medium">{Math.round(mealCal)} cal</span>
-                  )}
-                </div>
-
-                {foodEntries.length > 0 && (
-                  <div className="divide-y divide-gray-50">
-                    {foodEntries.map((fe) => (
-                      <DiaryFoodEntry key={fe.id} entry={fe} diaryEntryId={(fe as FoodEntryData & { _diaryEntryId?: string })._diaryEntryId || entry!.id} date={date} />
-                    ))}
-                  </div>
-                )}
-
-                <Link
-                  href={`/diary/add-food?meal=${encodeURIComponent(meal)}&date=${date}`}
-                  className="block px-4 py-3 text-brand-600 text-sm font-medium active:bg-gray-50 min-h-[44px] flex items-center"
-                >
-                  + Add Food
-                </Link>
-              </div>
-            );
-          })}
-
-          <JournalSection date={date} />
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-4">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <div>
+            <h2 className="font-semibold text-gray-900">Food Log</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Hindi, Hinglish ya English mein food likhkar log karo</p>
+          </div>
+          <Link
+            href={'/diary/add-food?date=' + date}
+            className="bg-brand-600 text-white rounded-lg px-3 py-2 text-sm font-semibold min-h-[40px] flex items-center justify-center"
+          >
+            + Log Food
+          </Link>
         </div>
-      )}
+
+        {loading ? (
+          <p className="text-center text-gray-500 py-8">Loading food log...</p>
+        ) : loadError ? (
+          <div className="p-4">
+            <p className="text-sm text-red-600">{loadError}</p>
+            <button onClick={() => window.location.reload()} className="mt-3 text-sm font-semibold text-brand-600">Try again</button>
+          </div>
+        ) : allFoodEntries.length > 0 ? (
+          <div className="divide-y divide-gray-50">
+            {allFoodEntries.map(({ foodEntry, diaryEntryId }) => (
+              <DiaryFoodEntry key={foodEntry.id} entry={foodEntry} diaryEntryId={diaryEntryId} date={date} />
+            ))}
+          </div>
+        ) : (
+          <div className="px-5 py-10 text-center">
+            <div className="text-3xl mb-2">🍲</div>
+            <p className="font-semibold text-gray-800">Abhi kuch log nahi hua</p>
+            <p className="text-sm text-gray-500 mt-1">Jaise: “2 roti, ek katori dal aur ek glass doodh”</p>
+            <Link href={'/diary/add-food?date=' + date} className="inline-flex mt-4 rounded-lg bg-brand-600 px-5 py-3 text-white font-semibold">
+              Log my food
+            </Link>
+          </div>
+        )}
+      </div>
+
+      <JournalSection date={date} />
     </div>
   );
 }
