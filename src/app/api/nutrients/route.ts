@@ -153,7 +153,6 @@ export async function POST(request: Request) {
       goalCarbsG: targets.carbs,
       goalFatG: targets.fat,
       goalFiberG: targets.fiber,
-      goalSodiumMg: targets.sodium,
     }).where(eq(schema.healthProfiles.userId, session.user.id)).run();
     return NextResponse.json({ success: true, targets });
   } catch (err) {
