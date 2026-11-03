@@ -25,6 +25,9 @@ interface FoodEntryData {
     protein_g: number | null;
     carbs_g: number | null;
     fat_g: number | null;
+    fiber_g: number | null;
+    sodium_mg: number | null;
+    sugar_g: number | null;
     default_serving_size: number | null;
     default_serving_unit: string | null;
   } | null;
@@ -40,6 +43,16 @@ interface DiaryEntry {
   food_entries: FoodEntryData[];
 }
 
+function sumWhenComplete(values: Array<number | null>): number | null {
+  if (values.length === 0) return 0;
+  if (values.some((value) => value === null || !Number.isFinite(value))) return null;
+  return values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+}
+
+function displayTotal(value: number | null, unit = ''): string {
+  return value === null ? 'Incomplete' : String(Math.round(value * 10) / 10) + unit;
+}
+
 export { type FoodEntryData };
 
 export default function DiaryDatePage() {
@@ -48,6 +61,7 @@ export default function DiaryDatePage() {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [isMinor, setIsMinor] = useState(true);
 
   useEffect(() => {
     async function loadDiary() {
@@ -64,6 +78,7 @@ export default function DiaryDatePage() {
         }
         const data = await res.json();
         setEntries(data.entries || []);
+        setIsMinor(data.isMinor !== false);
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : 'Please try again.');
       } finally {
@@ -80,10 +95,10 @@ export default function DiaryDatePage() {
     })),
   );
 
-  const dayCal = entries.reduce((sum, entry) => sum + (entry.total_calories || 0), 0);
-  const dayPro = entries.reduce((sum, entry) => sum + (entry.total_protein_g || 0), 0);
-  const dayCarb = entries.reduce((sum, entry) => sum + (entry.total_carbs_g || 0), 0);
-  const dayFat = entries.reduce((sum, entry) => sum + (entry.total_fat_g || 0), 0);
+  const dayCal = sumWhenComplete(entries.map((entry) => entry.total_calories));
+  const dayPro = sumWhenComplete(entries.map((entry) => entry.total_protein_g));
+  const dayCarb = sumWhenComplete(entries.map((entry) => entry.total_carbs_g));
+  const dayFat = sumWhenComplete(entries.map((entry) => entry.total_fat_g));
 
   const parts = date.split('-').map(Number);
   const year = parts[0], month = parts[1], day = parts[2];
@@ -106,22 +121,22 @@ export default function DiaryDatePage() {
         displayDate={String(month).padStart(2, '0') + '/' + String(day).padStart(2, '0') + '/' + year}
       />
 
-      {dayCal > 0 && (
-        <div className="grid grid-cols-4 gap-2 text-center mb-4">
-          <div className="bg-orange-50 rounded-lg p-2">
-            <p className="text-lg font-bold text-orange-600">{Math.round(dayCal)}</p>
-            <p className="text-[10px] text-gray-500">cal</p>
-          </div>
+      {!loading && !loadError && entries.length > 0 && (
+        <div className={`grid ${isMinor ? 'grid-cols-3' : 'grid-cols-4'} gap-2 text-center mb-4">
+          {!isMinor && <div className="bg-orange-50 rounded-lg p-2">
+            <p className="text-lg font-bold text-orange-600">{displayTotal(dayCal)}</p>
+            <p className="text-[10px] text-gray-500">calories</p>
+          </div>}
           <div className="bg-blue-50 rounded-lg p-2">
-            <p className="text-lg font-bold text-blue-600">{Math.round(dayPro)}g</p>
+            <p className="text-lg font-bold text-blue-600">{displayTotal(dayPro, 'g')}</p>
             <p className="text-[10px] text-gray-500">protein</p>
           </div>
           <div className="bg-green-50 rounded-lg p-2">
-            <p className="text-lg font-bold text-green-600">{Math.round(dayCarb)}g</p>
+            <p className="text-lg font-bold text-green-600">{displayTotal(dayCarb, 'g')}</p>
             <p className="text-[10px] text-gray-500">carbs</p>
           </div>
           <div className="bg-purple-50 rounded-lg p-2">
-            <p className="text-lg font-bold text-purple-600">{Math.round(dayFat)}g</p>
+            <p className="text-lg font-bold text-purple-600">{displayTotal(dayFat, 'g')}</p>
             <p className="text-[10px] text-gray-500">fat</p>
           </div>
         </div>
@@ -151,7 +166,7 @@ export default function DiaryDatePage() {
         ) : allFoodEntries.length > 0 ? (
           <div className="divide-y divide-gray-50">
             {allFoodEntries.map(({ foodEntry, diaryEntryId }) => (
-              <DiaryFoodEntry key={foodEntry.id} entry={foodEntry} diaryEntryId={diaryEntryId} date={date} />
+              <DiaryFoodEntry key={foodEntry.id} entry={foodEntry} diaryEntryId={diaryEntryId} date={date} isMinor={isMinor} />
             ))}
           </div>
         ) : (
