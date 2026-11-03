@@ -25,3 +25,28 @@ export function validIsoDate(value: string): boolean {
   const date = new Date(value + 'T00:00:00.000Z');
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
+
+
+/** Return age only for a real ISO calendar date and a valid age range. */
+export function ageFromDateOfBirth(dateOfBirth?: string | null, onDate: Date = new Date()): number | null {
+  if (!dateOfBirth || !validIsoDate(dateOfBirth)) return null;
+  const birth = new Date(dateOfBirth + 'T00:00:00.000Z');
+  let age = onDate.getUTCFullYear() - birth.getUTCFullYear();
+  if (
+    onDate.getUTCMonth() < birth.getUTCMonth()
+    || (onDate.getUTCMonth() === birth.getUTCMonth() && onDate.getUTCDate() < birth.getUTCDate())
+  ) age--;
+  return age >= 0 && age < 120 ? age : null;
+}
+
+/** Unknown or invalid age is handled conservatively as under 18. */
+export function isUnder18OrUnknown(dateOfBirth?: string | null): boolean {
+  const age = ageFromDateOfBirth(dateOfBirth);
+  return age === null || age < 18;
+}
+
+/** A valid adult DOB must be present before enabling weight-focused tools. */
+export function isVerifiedAdult(dateOfBirth?: string | null): boolean {
+  const age = ageFromDateOfBirth(dateOfBirth);
+  return age !== null && age >= 18;
+}
