@@ -21,7 +21,7 @@ const REQUIRED_TABLES = [
 async function main(): Promise<void> {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
-    throw new Error('DATABASE_URL is required for Tally PostgreSQL storage.');
+    throw new Error('DATABASE_URL is required for Nutrients PostgreSQL storage.');
   }
 
   const pool = new Pool({
@@ -48,8 +48,8 @@ async function main(): Promise<void> {
 
     if (missingTables.length > 0) {
       throw new Error(
-        `Tally Neon schema is incomplete. Missing tables: ${missingTables.join(', ')}. ` +
-        'Run the versioned Tally database migration before starting the web server.',
+        `Nutrients database schema is incomplete (the internal PostgreSQL schema is named tally). Missing tables: ${missingTables.join(', ')}. ` +
+        'Run the versioned database migration before starting the web server.',
       );
     }
 
@@ -69,7 +69,7 @@ async function main(): Promise<void> {
 
     if (!accessResult.rows[0]?.has_access) {
       throw new Error(
-        'The DATABASE_URL role must have SELECT, INSERT, UPDATE, and DELETE access to all Tally tables.',
+        'The DATABASE_URL role must have SELECT, INSERT, UPDATE, and DELETE access to all application tables.',
       );
     }
 
@@ -77,7 +77,7 @@ async function main(): Promise<void> {
       'SELECT current_database() AS database, current_user AS role',
     );
     console.log(
-      `Tally PostgreSQL schema verified: ${REQUIRED_TABLES.length} tables in ${identity.rows[0].database} ` +
+      `Nutrients PostgreSQL schema verified: ${REQUIRED_TABLES.length} tables in ${identity.rows[0].database} ` +
       `using role ${identity.rows[0].role}.`,
     );
   } finally {
@@ -86,6 +86,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error('Tally PostgreSQL schema verification failed:', error);
+  console.error('Nutrients PostgreSQL schema verification failed:', error);
   process.exitCode = 1;
 });

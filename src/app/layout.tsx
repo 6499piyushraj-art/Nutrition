@@ -20,16 +20,11 @@ const bricolage = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  title: "Tally",
-  description: "Your food, your goals, your data",
+  title: "Nutrients | Daily Nutrition",
+  description: "A warmer, simpler way to understand your food and daily nutrients.",
   icons: {
-    icon: [
-      { url: '/tally-favicon.svg', type: 'image/svg+xml' },
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-    ],
-    apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180' },
-    ],
+    icon: [{ url: "/nutrients-mark.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
 };
 

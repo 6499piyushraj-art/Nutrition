@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tally-v1';
+const CACHE_NAME = 'nutrients-v1';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
