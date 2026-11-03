@@ -48,8 +48,14 @@ export async function POST(request: Request) {
         .where(and(eq(schema.foods.userId, session.user.id), eq(schema.foods.description, description))).get();
       if (oldFood) foodId = oldFood.id;
       else {
+        const fdcId = typeof foodData.fdc_id === 'number' && Number.isInteger(foodData.fdc_id) && foodData.fdc_id > 0 ? foodData.fdc_id : null;
         const created = await db.insert(schema.foods).values({
-          userId: session.user.id, description, source: foodData.source === 'ai-log' ? 'ai-log' : 'manual',
+          userId: session.user.id,
+          description,
+          fdcId,
+          brandName: typeof foodData.brand_name === 'string' ? foodData.brand_name.slice(0, 160) : null,
+          dataType: typeof foodData.data_type === 'string' ? foodData.data_type.slice(0, 80) : null,
+          source: foodData.source === 'ai-log' ? 'ai-log' : foodData.source === 'usda_fdc' ? 'usda_fdc' : 'manual',
           defaultServingSize: typeof foodData.serving_size === 'number' ? foodData.serving_size : 1,
           defaultServingUnit: typeof foodData.serving_unit === 'string' ? foodData.serving_unit : 'serving',
           energyKcal: typeof foodData.calories === 'number' ? foodData.calories : null,
