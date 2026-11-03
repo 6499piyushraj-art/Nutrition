@@ -6,6 +6,21 @@ import { validIsoDate } from '@/lib/nutrition-calculator';
 
 export const dynamic = 'force-dynamic';
 
+type ExportRow = {
+  date: string;
+  meal: string | null;
+  food: string | null;
+  quantity: number;
+  calories: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  fiber_g: number | null;
+  sodium_mg: number | null;
+  nutrients: Record<string, number> | null;
+  source: string | null;
+};
+
 function csvCell(value: unknown): string {
   let text = value == null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value);
   if (/^[=+@-]/.test(text)) text = "'" + text;
@@ -29,7 +44,7 @@ export async function GET(request: Request) {
   if (span > 365) return NextResponse.json({ error: 'Export range cannot exceed 366 days.' }, { status: 400 });
 
   try {
-    const rows = await db.select({
+    const rows: ExportRow[] = await db.select({
       date: schema.diaryEntries.date,
       meal: schema.diaryEntries.diaryMeal,
       food: schema.foods.description,
@@ -50,7 +65,7 @@ export async function GET(request: Request) {
         eq(schema.diaryEntries.type, 'diary_meal'),
         gte(schema.diaryEntries.date, from),
         lte(schema.diaryEntries.date, to),
-      )).orderBy(asc(schema.diaryEntries.date), asc(schema.diaryEntries.createdAt)).all();
+      )).orderBy(asc(schema.diaryEntries.date), asc(schema.diaryEntries.createdAt)).all() as ExportRow[];
 
     if (format === 'json') {
       return new NextResponse(JSON.stringify({ from, to, records: rows }, null, 2), {
