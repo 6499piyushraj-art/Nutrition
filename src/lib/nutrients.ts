@@ -89,14 +89,26 @@ export function getDefaultNutrientTargets(profile?: ProfileForTargets): Nutrient
     targets.zinc = sex === 'M' ? 17.6 : 14.2;
     targets.vitamin_d = 15;
     targets.b12 = 2.2;
-    targets.folate = sex === 'M' ? 340 : 330;
-    targets.vitamin_c = sex === 'M' ? 85 : 75;
-    targets.vitamin_a = sex === 'M' ? 1000 : 900;
+    targets.folate = sex === 'M' ? 340 : 270;
+    targets.vitamin_c = sex === 'M' ? 85 : 70;
+    targets.vitamin_a = sex === 'M' ? 1000 : 860;
+    targets.iodine = 140;
+  } else if (age !== null && age >= 19 && sex) {
+    // Adult sedentary-work starting references from the same ICMR-NIN summary.
+    // Energy and macronutrient targets remain editable and are not inferred here.
+    targets.protein = sex === 'M' ? 54 : 46;
+    targets.fiber = sex === 'M' ? 30 : 25;
+    targets.calcium = 1000;
+    targets.iron = sex === 'M' ? 19 : 29;
+    targets.zinc = sex === 'M' ? 17 : 13.2;
+    targets.vitamin_d = 15;
+    targets.b12 = 2.2;
+    targets.folate = sex === 'M' ? 300 : 220;
+    targets.vitamin_c = sex === 'M' ? 80 : 65;
+    targets.vitamin_a = sex === 'M' ? 1000 : 840;
     targets.iodine = 140;
   } else if (age !== null && age >= 19) {
-    if (sex === 'F') targets.fiber = 25;
-    else if (sex === 'M') targets.fiber = 30;
-    else targets.fiber = 28;
+    targets.fiber = 28;
   }
   return targets;
 }
