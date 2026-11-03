@@ -99,7 +99,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           <img src="/nutrients-mark.svg" alt="Nutrients" className="w-10 h-10" />
           <div>
-            <p className="mb-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700">Nutrients</p>
+            <p className="mb-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700">MyNutri</p>
             <h1 className="text-lg font-bold text-gray-900">
               Hi, {data.user.first_name || 'there'}
             </h1>
