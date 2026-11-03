@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "tsx src/lib/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
-    "postinstall": "npm run build"
+    "postinstall": "npm run build",
+    "test": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
