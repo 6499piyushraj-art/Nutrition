@@ -15,6 +15,8 @@ function isUnder18OrUnknown(value?: string | null): boolean {
 
 export const dynamic = 'force-dynamic';
 
+type MeasurementRecord = { id: string; date: string; type: string; value: number; unit: string | null };
+
 export default async function ProgressPage() {
   const session = await getSession();
   if (!session) redirect('/login');
@@ -24,14 +26,14 @@ export default async function ProgressPage() {
   const restricted = isUnder18OrUnknown(profile?.dateOfBirth);
   const conditions = [eq(schema.measurements.userId, session.user.id)];
   if (restricted) conditions.push(eq(schema.measurements.type, 'height'));
-  const records = await db.select({
+  const records: MeasurementRecord[] = await db.select({
     id: schema.measurements.id,
     date: schema.measurements.date,
     type: schema.measurements.type,
     value: schema.measurements.value,
     unit: schema.measurements.unit,
   }).from(schema.measurements).where(and(...conditions))
-    .orderBy(asc(schema.measurements.date)).limit(180).all();
+    .orderBy(asc(schema.measurements.date)).limit(180).all() as MeasurementRecord[];
 
   return (
     <section className="space-y-4 pb-24">
