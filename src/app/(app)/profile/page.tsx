@@ -62,7 +62,7 @@ async function getWeightHistory(userId: string) {
 function isMinorDob(value?: string): boolean {
   if (!value || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return true;
   const dob = new Date(value + 'T00:00:00');
-  if (Number.isNaN(dob.getTime())) return true;
+  if (Number.isNaN(dob.getTime()) || dob.toISOString().slice(0, 10) !== value) return true;
   const now = new Date();
   let age = now.getFullYear() - dob.getFullYear();
   if (now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) age--;
