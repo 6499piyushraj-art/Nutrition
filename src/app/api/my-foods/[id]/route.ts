@@ -42,7 +42,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
     if (!food) return NextResponse.json({ error: 'Food not found.' }, { status: 404 });
 
-    const tags = await db.select({
+    const tags: Array<{ id: string; name: string; color: string | null }> = await db.select({
       id: schema.foodTags.id, name: schema.foodTags.name, color: schema.foodTags.color,
     }).from(schema.foodsToFoodTags)
       .innerJoin(schema.foodTags, eq(schema.foodsToFoodTags.foodTagId, schema.foodTags.id))
