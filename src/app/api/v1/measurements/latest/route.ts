@@ -3,7 +3,6 @@ import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { and, desc, eq } from 'drizzle-orm';
 import { isUnder18OrUnknown } from '@/lib/nutrition-calculator';
-import { isUnder18OrUnknown } from '@/lib/nutrition-calculator';
 
 export const dynamic = 'force-dynamic';
 
