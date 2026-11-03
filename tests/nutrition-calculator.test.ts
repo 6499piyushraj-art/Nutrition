@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { aggregateKnownValues, scaleNutrients, validIsoDate } from '../src/lib/nutrition-calculator';
+import { getDefaultNutrientTargets, getNutrientReferenceMetadata } from '../src/lib/nutrients';
 
 test('scales per-serving values proportionally', () => {
   assert.deepEqual(scaleNutrients({ calories: 100, protein: 4, calcium: null }, 1.5), {
@@ -46,7 +47,6 @@ test('validates real ISO calendar dates', () => {
 
 
 test('uses the ICMR-NIN 2020 16–18 reference band for girls', () => {
-  const { getDefaultNutrientTargets } = require('../src/lib/nutrients') as typeof import('../src/lib/nutrients');
   const targets = getDefaultNutrientTargets({ dateOfBirth: '2009-01-01', sex: 'F' });
   assert.equal(targets.protein, 46);
   assert.equal(targets.iron, 32);
@@ -67,7 +67,6 @@ test('uses the ICMR-NIN 2020 16–18 reference band for boys', () => {
 });
 
 test('falls back to unclassified references for invalid birth dates', () => {
-  const { getNutrientReferenceMetadata } = require('../src/lib/nutrients') as typeof import('../src/lib/nutrients');
   const metadata = getNutrientReferenceMetadata({ dateOfBirth: '2009-02-30', sex: 'M' });
   assert.equal(metadata.populationGroup, 'General starting values; age/sex-specific reference not selected');
 });
