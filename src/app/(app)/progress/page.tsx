@@ -2,16 +2,8 @@ import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { db, schema } from '@/lib/db';
 import { and, asc, eq } from 'drizzle-orm';
+import { isUnder18OrUnknown } from '@/lib/nutrition-calculator';
 
-function isUnder18OrUnknown(value?: string | null): boolean {
-  if (!value || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return true;
-  const birth = new Date(value + 'T00:00:00');
-  if (Number.isNaN(birth.getTime())) return true;
-  const now = new Date();
-  let age = now.getFullYear() - birth.getFullYear();
-  if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
-  return age < 18 || age < 0;
-}
 
 export const dynamic = 'force-dynamic';
 
