@@ -766,6 +766,17 @@ app.use((err, _req, res, _next) => {
   return res.status(400).json({ error: "The request could not be processed. Please try again." });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
+const server = app.listen(PORT, "0.0.0.0", async () => {
   console.log("MyNutri AI listening on port " + PORT);
+  if (!pool) {
+    console.error("Neon PostgreSQL is not configured; cloud persistence is unavailable.");
+    return;
+  }
+  try {
+    await pool.query("SELECT 1");
+    console.log("Neon PostgreSQL connection verified.");
+  } catch (error) {
+    console.error("Neon PostgreSQL connection failed:", String(error?.code || "unknown"));
+    server.close(() => process.exit(1));
+  }
 });
