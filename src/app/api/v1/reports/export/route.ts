@@ -60,7 +60,7 @@ export async function GET(request: Request) {
           eq(schema.measurements.userId, session.user.id),
           gte(schema.measurements.date, from),
           lte(schema.measurements.date, to),
-        )).orderBy(asc(schema.measurements.date)) as MeasurementExportRow[];
+        )).orderBy(asc(schema.measurements.date)).all() as MeasurementExportRow[];
 
       if (format === 'json') {
         return new NextResponse(JSON.stringify({ kind, from, to, records: rows }, null, 2), {
