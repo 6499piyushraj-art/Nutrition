@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { recalcDiaryTotals } from '@/lib/db/helpers';
 import { validIsoDate } from '@/lib/nutrition-calculator';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 function numericRecord(value: unknown): Record<string, number> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     let foodId: string | null = typeof foodData.food_id === 'string' ? foodData.food_id : null;
     if (foodId) {
       const owned = await db.select({ id: schema.foods.id }).from(schema.foods)
-        .where(and(eq(schema.foods.id, foodId), eq(schema.foods.userId, session.user.id))).get();
+        .where(and(eq(schema.foods.id, foodId), eq(schema.foods.userId, session.user.id), isNull(schema.foods.deletedAt))).get();
       if (!owned) return NextResponse.json({ error: 'Food not found.' }, { status: 404 });
     }
 
