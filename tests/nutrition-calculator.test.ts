@@ -43,3 +43,31 @@ test('validates real ISO calendar dates', () => {
   assert.equal(validIsoDate('2026-13-01'), false);
   assert.equal(validIsoDate('03-11-2026'), false);
 });
+
+
+test('uses the ICMR-NIN 2020 16–18 reference band for girls', () => {
+  const { getDefaultNutrientTargets } = require('../src/lib/nutrients') as typeof import('../src/lib/nutrients');
+  const targets = getDefaultNutrientTargets({ dateOfBirth: '2009-01-01', sex: 'F' });
+  assert.equal(targets.protein, 46);
+  assert.equal(targets.iron, 32);
+  assert.equal(targets.zinc, 14.2);
+  assert.equal(targets.folate, 270);
+  assert.equal(targets.vitamin_c, 70);
+  assert.equal(targets.vitamin_a, 860);
+});
+
+test('uses the ICMR-NIN 2020 16–18 reference band for boys', () => {
+  const { getDefaultNutrientTargets } = require('../src/lib/nutrients') as typeof import('../src/lib/nutrients');
+  const targets = getDefaultNutrientTargets({ dateOfBirth: '2009-01-01', sex: 'M' });
+  assert.equal(targets.protein, 55);
+  assert.equal(targets.iron, 26);
+  assert.equal(targets.zinc, 17.6);
+  assert.equal(targets.folate, 340);
+  assert.equal(targets.vitamin_c, 85);
+});
+
+test('falls back to unclassified references for invalid birth dates', () => {
+  const { getNutrientReferenceMetadata } = require('../src/lib/nutrients') as typeof import('../src/lib/nutrients');
+  const metadata = getNutrientReferenceMetadata({ dateOfBirth: '2009-02-30', sex: 'M' });
+  assert.equal(metadata.populationGroup, 'General starting values; age/sex-specific reference not selected');
+});
