@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     }
 
     const age = ageFromDob(typeof update.dateOfBirth === 'string' ? update.dateOfBirth : existing?.dateOfBirth);
-    if (age !== null && age < 18) {
+    if (age === null || age < 18) {
       delete update.goalWeightLbs;
       delete update.goalTargetDate;
       delete update.weeklyGoal;
