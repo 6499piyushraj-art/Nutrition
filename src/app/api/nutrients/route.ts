@@ -64,7 +64,7 @@ export async function GET(request: Request) {
   const date = searchParams.get('date') || defaultDate;
   try {
     const profileAge = await db.select({ dateOfBirth: schema.healthProfiles.dateOfBirth }).from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();
-    const isMinor = (() => { const dob = profileAge?.dateOfBirth; if (!dob || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dob)) return false; const birth = new Date(dob + 'T00:00:00'); const now = new Date(); let age = now.getFullYear() - birth.getFullYear(); if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--; return age >= 0 && age < 18; })();
+    const isMinor = (() => { const dob = profileAge?.dateOfBirth; if (!dob || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dob)) return true; const birth = new Date(dob + 'T00:00:00'); if (Number.isNaN(birth.getTime())) return true; const now = new Date(); let age = now.getFullYear() - birth.getFullYear(); if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--; return age < 18 || age < 0; })();
     const targets = await readTargets(session.user.id);
     const rows = await db.select({
       energyKcal: schema.foodEntries.energyKcal,
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
     }));
     const allowed = new Set(NUTRIENT_SPECS.map((item) => item.key));
     const dob = profile?.dateOfBirth;
-    const minor = typeof dob === 'string' && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dob) && (() => { const birth = new Date(dob + 'T00:00:00'); const now = new Date(); let age = now.getFullYear() - birth.getFullYear(); if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--; return age >= 0 && age < 18; })();
+    const minor = !dob || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dob) || (() => { const birth = new Date(dob + 'T00:00:00'); if (Number.isNaN(birth.getTime())) return true; const now = new Date(); let age = now.getFullYear() - birth.getFullYear(); if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--; return age < 18 || age < 0; })();
     for (const [key, value] of Object.entries(body.targets as Record<string, unknown>)) {
       if (!allowed.has(key as never) || (minor && key === 'calories')) continue;
       if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 10000000) {
