@@ -98,3 +98,32 @@ test("Gemini uses grounded Google Search with structured output, handles images 
   assert.match(client, /Google Search sources/);
   assert.match(page, /id="review-sources"/);
 });
+
+
+test("Neon persistence is server-side, protected, and backed by a tracked schema", async () => {
+  const server = await read("server.js");
+  const client = await read("public/app.js");
+  const migration = await read("migrations/001_neon_persistence.sql");
+  const env = await read(".env.example");
+  assert.match(server, /new Pool\(/);
+  assert.match(server, /process\.env\.DATABASE_URL/);
+  assert.match(server, /app\.get\("\/api\/state"/);
+  assert.match(server, /app\.put\("\/api\/targets"/);
+  assert.match(server, /app\.post\("\/api\/meals"/);
+  assert.match(server, /app\.delete\("\/api\/meals\/:id"/);
+  assert.match(client, /initializeRemoteState/);
+  assert.match(client, /apiRequest\("\/api\/meals"/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.nutrition_profiles/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.nutrition_meal_logs/);
+  assert.match(env, /^DATABASE_URL=/m);
+});
+
+test("Render keeps the Neon connection string as a private synced secret input", async () => {
+  const config = await read("render.yaml");
+  assert.match(config, /key: DATABASE_URL\s+sync: false/);
+});
+
+test("starting the service runs the test suite before the server process", async () => {
+  const pkg = JSON.parse(await read("package.json"));
+  assert.equal(pkg.scripts.prestart, "npm test");
+});
