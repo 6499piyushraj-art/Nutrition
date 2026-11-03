@@ -33,7 +33,9 @@ export async function GET(request: Request) {
 
   const params = new URL(request.url).searchParams;
   const format = params.get('format') || 'csv';
+  const kind = params.get('kind') || 'food';
   if (format !== 'csv' && format !== 'json') return NextResponse.json({ error: 'format must be csv or json.' }, { status: 400 });
+  if (kind !== 'food' && kind !== 'measurements') return NextResponse.json({ error: 'kind must be food or measurements.' }, { status: 400 });
 
   const now = new Date();
   const today = [now.getFullYear(), String(now.getMonth()+1).padStart(2,'0'), String(now.getDate()).padStart(2,'0')].join('-');
@@ -44,6 +46,40 @@ export async function GET(request: Request) {
   if (span > 365) return NextResponse.json({ error: 'Export range cannot exceed 366 days.' }, { status: 400 });
 
   try {
+    if (kind === 'measurements') {
+      const rows = await db.select({
+        date: schema.measurements.date,
+        type: schema.measurements.type,
+        value: schema.measurements.value,
+        unit: schema.measurements.unit,
+        notes: schema.measurements.notes,
+      }).from(schema.measurements)
+        .where(and(
+          eq(schema.measurements.userId, session.user.id),
+          gte(schema.measurements.date, from),
+          lte(schema.measurements.date, to),
+        )).orderBy(asc(schema.measurements.date));
+
+      if (format === 'json') {
+        return new NextResponse(JSON.stringify({ kind, from, to, records: rows }, null, 2), {
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Content-Disposition': `attachment; filename="mynutri-measurements-${from}-${to}.json"`,
+            'Cache-Control': 'no-store',
+          },
+        });
+      }
+      const columns = ['date','type','value','unit','notes'] as const;
+      const lines = [columns.join(','), ...rows.map((row) => columns.map((column) => csvCell(row[column])).join(','))];
+      return new NextResponse(lines.join('\\r\\n'), {
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="mynutri-measurements-${from}-${to}.csv"`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
+
     const rows: ExportRow[] = await db.select({
       date: schema.diaryEntries.date,
       meal: schema.diaryEntries.diaryMeal,
@@ -68,7 +104,7 @@ export async function GET(request: Request) {
       )).orderBy(asc(schema.diaryEntries.date), asc(schema.diaryEntries.createdAt)).all() as ExportRow[];
 
     if (format === 'json') {
-      return new NextResponse(JSON.stringify({ from, to, records: rows }, null, 2), {
+      return new NextResponse(JSON.stringify({ kind, from, to, records: rows }, null, 2), {
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
           'Content-Disposition': `attachment; filename="mynutri-food-history-${from}-${to}.json"`,
@@ -79,7 +115,7 @@ export async function GET(request: Request) {
 
     const columns = ['date','meal','food','quantity','calories','protein_g','carbs_g','fat_g','fiber_g','sodium_mg','nutrients','source'] as const;
     const lines = [columns.join(','), ...rows.map((row) => columns.map((column) => csvCell(row[column])).join(','))];
-    return new NextResponse(lines.join('\r\n'), {
+    return new NextResponse(lines.join('\\r\\n'), {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="mynutri-food-history-${from}-${to}.csv"`,
