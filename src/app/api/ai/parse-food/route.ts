@@ -13,8 +13,12 @@ export async function POST(request: Request) {
   catch { return NextResponse.json({ error: 'Request body must be valid JSON.' }, { status: 400 }); }
   const type = String(body.type || '');
   const content = body.content;
-  if (!content || (type !== 'text' && type !== 'image')) return NextResponse.json({ error: 'A food description or image is required.' }, { status: 400 });
-  if (type === 'image' && !body.mediaType) return NextResponse.json({ error: 'Gemini image parsing requires an image media type.' }, { status: 400 });
+  if (typeof content !== 'string' || !content.trim() || (type !== 'text' && type !== 'image')) return NextResponse.json({ error: 'A food description or image is required.' }, { status: 400 });
+  if (type === 'text' && content.length > 8000) return NextResponse.json({ error: 'Food description is too long.' }, { status: 413 });
+  if (type === 'image') {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(String(body.mediaType || ''))) return NextResponse.json({ error: 'Use a JPEG, PNG, or WebP image.' }, { status: 415 });
+    if (content.length > 4_200_000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(content)) return NextResponse.json({ error: 'Image is too large or has an invalid encoding.' }, { status: 413 });
+  }
   const { allowed, retryAfterMs } = checkRateLimit('ai:' + session.user.id, AI_DAILY_LIMIT, AI_WINDOW_MS);
   if (!allowed) {
     const hours = Math.ceil(retryAfterMs / 3600000);
