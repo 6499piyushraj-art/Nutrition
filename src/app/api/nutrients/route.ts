@@ -63,7 +63,7 @@ export async function GET(request: Request) {
   const defaultDate = String(now.getFullYear()) + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
   const date = searchParams.get('date') || defaultDate;
   try {
-    const targets = await readTargets(session.user.id);
+    const profileAge = await db.select({ dateOfBirth: schema.healthProfiles.dateOfBirth }).from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();\n    const isMinor = (() => { const dob = profileAge?.dateOfBirth; if (!dob || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dob)) return false; const birth = new Date(dob + 'T00:00:00'); const now = new Date(); let age = now.getFullYear() - birth.getFullYear(); if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--; return age >= 0 && age < 18; })();\n    const targets = await readTargets(session.user.id);
     const rows = await db.select({
       energyKcal: schema.foodEntries.energyKcal,
       proteinG: schema.foodEntries.proteinG,
@@ -99,7 +99,7 @@ export async function GET(request: Request) {
       nutrition[spec.key] = { value, status, confidence: confidenceFor(sources), knownFoods, totalFoods: rows.length };
     }
     return NextResponse.json({
-      date, targets, nutrition, foodsLogged: rows.length,
+      date, targets: isMinor ? Object.fromEntries(Object.entries(targets).filter(([key]) => key !== 'calories')) : targets, nutrition: isMinor ? Object.fromEntries(Object.entries(nutrition).filter(([key]) => key !== 'calories')) : nutrition, foodsLogged: rows.length, isMinor,
       targetNotes: {
         valuesAreConfigurable: true,
         referenceNotPrescription: true,
