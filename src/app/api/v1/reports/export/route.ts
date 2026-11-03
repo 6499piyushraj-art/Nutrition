@@ -71,7 +71,7 @@ export async function GET(request: Request) {
       }
       const columns = ['date','type','value','unit','notes'] as const;
       const lines = [columns.join(','), ...rows.map((row) => columns.map((column) => csvCell(row[column])).join(','))];
-      return new NextResponse(lines.join('\\r\\n'), {
+      return new NextResponse(lines.join('\r\n'), {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': `attachment; filename="mynutri-measurements-${from}-${to}.csv"`,
@@ -115,7 +115,7 @@ export async function GET(request: Request) {
 
     const columns = ['date','meal','food','quantity','calories','protein_g','carbs_g','fat_g','fiber_g','sodium_mg','nutrients','source'] as const;
     const lines = [columns.join(','), ...rows.map((row) => columns.map((column) => csvCell(row[column])).join(','))];
-    return new NextResponse(lines.join('\\r\\n'), {
+    return new NextResponse(lines.join('\r\n'), {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="mynutri-food-history-${from}-${to}.csv"`,
