@@ -9,7 +9,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const meals = await db
+    const meals: Array<typeof schema.meals.$inferSelect> = await db
       .select()
       .from(schema.meals)
       .where(
@@ -42,7 +42,7 @@ export async function GET() {
           .where(eq(schema.mealItems.mealId, meal.id));
 
         // Fetch meal tags with nested structure (frontend expects this shape)
-        const tagRecords = await db
+        const tagRecords: Array<{ id: string; foodTagId: string; tagName: string; tagColor: string | null }> = await db
           .select({
             id: schema.mealsToFoodTags.id,
             foodTagId: schema.mealsToFoodTags.foodTagId,
