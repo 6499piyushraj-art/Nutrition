@@ -2,6 +2,7 @@ import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { db, schema } from '@/lib/db';
 import { eq, and, asc } from 'drizzle-orm';
+import { isUnder18OrUnknown } from '@/lib/nutrition-calculator';
 import ProfileForm from '@/components/profile/ProfileForm';
 import WeightChart from '@/components/profile/WeightChart';
 import TagManager from '@/components/profile/TagManager';
@@ -59,22 +60,13 @@ async function getWeightHistory(userId: string) {
     .all();
 }
 
-function isMinorDob(value?: string): boolean {
-  if (!value || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return true;
-  const dob = new Date(value + 'T00:00:00');
-  if (Number.isNaN(dob.getTime()) || dob.toISOString().slice(0, 10) !== value) return true;
-  const now = new Date();
-  let age = now.getFullYear() - dob.getFullYear();
-  if (now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) age--;
-  return age >= 0 && age < 18;
-}
 
 export default async function ProfilePage() {
   const session = await getSession();
   if (!session) redirect('/login');
 
   const profile = await getProfile(session.user.id);
-  const isMinor = isMinorDob(profile?.date_of_birth);
+  const isMinor = isUnder18OrUnknown(profile?.date_of_birth);
   const weightHistory = isMinor ? [] : await getWeightHistory(session.user.id);
 
   return (
