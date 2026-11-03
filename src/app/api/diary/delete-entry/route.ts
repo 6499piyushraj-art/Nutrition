@@ -16,11 +16,11 @@ export async function POST(request: Request) {
 
   try {
     // Delete the food entry
-    db.delete(schema.foodEntries).where(eq(schema.foodEntries.id, foodEntryId)).run();
+    await db.delete(schema.foodEntries).where(eq(schema.foodEntries.id, foodEntryId)).run();
 
     // Recalculate diary entry totals
     if (diaryEntryId) {
-      recalcDiaryTotals(diaryEntryId);
+      await recalcDiaryTotals(diaryEntryId);
     }
 
     return NextResponse.json({ success: true });
