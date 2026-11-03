@@ -2,19 +2,10 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { and, eq, sql } from 'drizzle-orm';
-import { validIsoDate } from '@/lib/nutrition-calculator';
+import { isUnder18OrUnknown, validIsoDate } from '@/lib/nutrition-calculator';
 
 export const dynamic = 'force-dynamic';
 
-function ageFromDob(value?: string | null): number | null {
-  if (!value || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return null;
-  const dob = new Date(value + 'T00:00:00');
-  if (Number.isNaN(dob.getTime()) || dob.toISOString().slice(0, 10) !== value) return null;
-  const now = new Date();
-  let age = now.getFullYear() - dob.getFullYear();
-  if (now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) age--;
-  return age >= 0 && age < 120 ? age : null;
-}
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -45,8 +36,7 @@ export async function GET(request: Request) {
       eq(schema.diaryEntries.type, 'diary_meal'),
     )).get();
 
-    const age = ageFromDob(profile?.date_of_birth);
-    const isMinor = age === null || age < 18;
+    const isMinor = isUnder18OrUnknown(profile?.date_of_birth);
     const response = NextResponse.json({
       user: { first_name: session.user.first_name, last_name: session.user.last_name },
       profile: profile ? {
