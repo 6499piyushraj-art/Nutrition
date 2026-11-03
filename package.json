@@ -37,7 +37,8 @@
     "@types/node": "^20",
     "@types/pg": "^8.15.5",
     "@types/react": "^19",
-    "@types/react-dom": "^19"
+    "@types/react-dom": "^19",
+    "@google/genai": "^2.32.0"
   },
   "devDependencies": {
     "eslint": "^9",
