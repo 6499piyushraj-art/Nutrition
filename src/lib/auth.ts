@@ -27,7 +27,7 @@ export async function login(
   email: string,
   password: string,
 ): Promise<{ user: AuthUser; error?: never } | { user?: never; error: string }> {
-  const user = db.select().from(schema.users).where(eq(schema.users.email, email.toLowerCase())).get();
+  const user = await db.select().from(schema.users).where(eq(schema.users.email, email.toLowerCase())).get();
 
   if (!user) return { error: 'Invalid credentials' };
 
@@ -52,12 +52,12 @@ export async function signup(
   firstName: string,
   lastName: string,
 ): Promise<{ user: AuthUser; error?: never } | { user?: never; error: string }> {
-  const existing = db.select().from(schema.users).where(eq(schema.users.email, email.toLowerCase())).get();
+  const existing = await db.select().from(schema.users).where(eq(schema.users.email, email.toLowerCase())).get();
   if (existing) return { error: 'Email already registered' };
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const user = db.insert(schema.users).values({
+  const user = await db.insert(schema.users).values({
     email: email.toLowerCase(),
     passwordHash,
     firstName,
@@ -90,7 +90,7 @@ export async function getSession(): Promise<{ token: string; user: AuthUser } | 
   if (accessToken) {
     const payload = verifyToken(accessToken, 'access');
     if (payload) {
-      const user = getUserById(payload.userId);
+      const user = await getUserById(payload.userId);
       if (user) return { token: accessToken, user };
     }
   }
@@ -115,8 +115,8 @@ export async function getAccessToken(): Promise<string | null> {
   return session?.token ?? null;
 }
 
-function getUserById(id: string): AuthUser | null {
-  const user = db.select().from(schema.users).where(eq(schema.users.id, id)).get();
+async function getUserById(id: string): Promise<AuthUser | null> {
+  const user = await db.select().from(schema.users).where(eq(schema.users.id, id)).get();
   if (!user) return null;
 
   return {
