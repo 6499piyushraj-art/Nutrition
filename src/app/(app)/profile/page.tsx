@@ -10,8 +10,8 @@ import ChangePassword from '@/components/profile/ChangePassword';
 
 export const dynamic = 'force-dynamic';
 
-function getProfile(userId: string) {
-  const row = db.select().from(schema.healthProfiles)
+async function getProfile(userId: string) {
+  const row = await db.select().from(schema.healthProfiles)
     .where(eq(schema.healthProfiles.userId, userId))
     .get();
   if (!row) return null;
@@ -43,7 +43,7 @@ function getProfile(userId: string) {
   };
 }
 
-function getWeightHistory(userId: string) {
+async function getWeightHistory(userId: string) {
   return db.select({
     date: schema.measurements.date,
     value: schema.measurements.value,
@@ -62,8 +62,8 @@ export default async function ProfilePage() {
   const session = await getSession();
   if (!session) redirect('/login');
 
-  const profile = getProfile(session.user.id);
-  const weightHistory = getWeightHistory(session.user.id);
+  const profile = await getProfile(session.user.id);
+  const weightHistory = await getWeightHistory(session.user.id);
 
   return (
     <div className="pb-8">
