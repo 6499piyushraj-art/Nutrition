@@ -59,6 +59,7 @@ export function getNutrientReferenceMetadata(profile?: ProfileForTargets) {
   if (age !== null && age >= 13 && age <= 15 && sex) populationGroup = sex === 'M' ? 'Boys, 13–15 years' : 'Girls, 13–15 years';
   else if (age !== null && age >= 16 && age <= 18 && sex) populationGroup = sex === 'M' ? 'Boys, 16–18 years' : 'Girls, 16–18 years';
   else if (age !== null && age < 18) populationGroup = 'Adolescent; select a reference category with a trusted adult or qualified professional';
+  else if (age !== null && age >= 19 && sex) populationGroup = sex === 'M' ? 'Men, sedentary-work reference' : 'Women, sedentary-work reference';
   return { ...NUTRIENT_REFERENCE, populationGroup };
 }
 
