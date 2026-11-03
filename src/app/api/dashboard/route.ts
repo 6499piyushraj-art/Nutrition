@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     )).get();
 
     const age = ageFromDob(profile?.date_of_birth);
-    const isMinor = age !== null && age < 18;
+    const isMinor = age === null || age < 18;
     const response = NextResponse.json({
       user: { first_name: session.user.first_name, last_name: session.user.last_name },
       profile: profile ? {
