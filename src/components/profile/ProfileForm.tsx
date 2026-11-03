@@ -37,7 +37,7 @@ interface Props {
   userName: string;
 }
 
-export default function ProfileForm({ profile, userId, userEmail, userName }: Props) {
+export default function ProfileForm({ profile, userId, userEmail, userName, isMinor = false }: Props) {
   const [form, setForm] = useState({
     date_of_birth: profile?.date_of_birth || '',
     sex: profile?.sex || '',
@@ -278,7 +278,7 @@ export default function ProfileForm({ profile, userId, userEmail, userName }: Pr
         </div>
       </div>
 
-      {/* Daily Targets */}
+      }\n\n      {/* Daily Targets */}
       <div className="bg-white rounded-2xl p-5 shadow-sm">
         <h2 className="font-semibold text-gray-800 mb-3">Daily Targets</h2>
         <div className="space-y-3">
