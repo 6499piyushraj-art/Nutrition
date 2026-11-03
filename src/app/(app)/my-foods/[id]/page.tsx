@@ -26,7 +26,7 @@ export default async function FoodDetailPage({ params, searchParams }: Props) {
   const foodRow = await db.select().from(schema.foods).where(eq(schema.foods.id, id)).get();
   if (!foodRow) redirect('/my-foods');
 
-  const tagRows = await db.select({
+  const tagRows: Array<{ id: string; name: string; color: string | null }> = await db.select({
     id: schema.foodTags.id,
     name: schema.foodTags.name,
     color: schema.foodTags.color,
