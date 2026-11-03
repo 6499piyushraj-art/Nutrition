@@ -58,12 +58,22 @@ async function getWeightHistory(userId: string) {
     .all();
 }
 
+function isMinorDob(value?: string): boolean {
+  if (!value || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return false;
+  const dob = new Date(value + 'T00:00:00');
+  if (Number.isNaN(dob.getTime())) return false;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  if (now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) age--;
+  return age >= 0 && age < 18;
+}
+
 export default async function ProfilePage() {
   const session = await getSession();
   if (!session) redirect('/login');
 
   const profile = await getProfile(session.user.id);
-  const weightHistory = await getWeightHistory(session.user.id);
+  const isMinor = isMinorDob(profile?.date_of_birth);\n  const weightHistory = isMinor ? [] : await getWeightHistory(session.user.id);
 
   return (
     <div className="pb-8">
