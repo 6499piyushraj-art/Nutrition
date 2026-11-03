@@ -1,8 +1,8 @@
 import { db, schema } from '@/lib/db';
 import { eq, sql } from 'drizzle-orm';
 
-export function recalcDiaryTotals(diaryEntryId: string) {
-  const result = db
+export async function recalcDiaryTotals(diaryEntryId: string): Promise<void> {
+  const result = await db
     .select({
       totalCalories: sql<number>`coalesce(sum(${schema.foodEntries.energyKcal}), 0)`,
       totalProteinG: sql<number>`coalesce(sum(${schema.foodEntries.proteinG}), 0)`,
@@ -18,7 +18,7 @@ export function recalcDiaryTotals(diaryEntryId: string) {
 
   if (!result) return;
 
-  db.update(schema.diaryEntries)
+  await db.update(schema.diaryEntries)
     .set({
       totalCalories: result.totalCalories,
       totalProteinG: result.totalProteinG,
