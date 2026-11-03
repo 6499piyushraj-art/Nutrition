@@ -115,7 +115,7 @@ export default function DashboardPage() {
       <NutrientTracker />
 
       {/* Quick actions */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className={`grid ${data.isMinor ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
         <Link href="/diary" className="bg-white rounded-xl p-4 shadow-sm text-center active:bg-gray-50 min-h-[72px] flex flex-col items-center justify-center">
           <BookOpen size={24} className="text-brand-600 mb-1" />
           <span className="text-sm font-medium text-gray-700">Food Diary</span>
@@ -124,7 +124,7 @@ export default function DashboardPage() {
           <Plus size={24} className="text-brand-600 mb-1" />
           <span className="text-sm font-medium text-gray-700">Log Food</span>
         </Link>
-        <LogWeightButton />
+        {!data.isMinor && <LogWeightButton />}
       </div>
 
       {/* Setup prompt if no profile */}
