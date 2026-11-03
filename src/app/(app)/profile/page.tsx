@@ -73,7 +73,8 @@ export default async function ProfilePage() {
   if (!session) redirect('/login');
 
   const profile = await getProfile(session.user.id);
-  const isMinor = isMinorDob(profile?.date_of_birth);\n  const weightHistory = isMinor ? [] : await getWeightHistory(session.user.id);
+  const isMinor = isMinorDob(profile?.date_of_birth);
+  const weightHistory = isMinor ? [] : await getWeightHistory(session.user.id);
 
   return (
     <div className="pb-8">
@@ -82,12 +83,12 @@ export default async function ProfilePage() {
       </div>
 
       {/* Weight chart */}
-      <WeightChart
+      {!isMinor && <WeightChart
         measurements={weightHistory}
         startingWeight={profile?.starting_weight_lbs ?? null}
         goalWeight={profile?.goal_weight_lbs ?? null}
         goalDate={profile?.goal_target_date ?? null}
-      />
+      />}
 
       {/* Tag management */}
       <TagManager />
@@ -95,6 +96,7 @@ export default async function ProfilePage() {
       {/* Profile form */}
       <ProfileForm
         profile={profile}
+        isMinor={isMinor}
         userId={session.user.id}
         userEmail={session.user.email}
         userName={`${session.user.first_name || ''} ${session.user.last_name || ''}`.trim()}
