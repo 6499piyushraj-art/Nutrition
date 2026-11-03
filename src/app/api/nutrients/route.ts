@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { and, eq } from 'drizzle-orm';
-import { getDefaultNutrientTargets, NUTRIENT_SPECS, type NutrientConfidence, type NutrientStatus } from '@/lib/nutrients';
+import { getDefaultNutrientTargets, getNutrientReferenceMetadata, NUTRIENT_SPECS, type NutrientConfidence, type NutrientStatus } from '@/lib/nutrients';
 
 type FoodRow = {
   energyKcal: number | null;
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
   const defaultDate = String(now.getFullYear()) + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
   const date = searchParams.get('date') || defaultDate;
   try {
-    const profileAge = await db.select({ dateOfBirth: schema.healthProfiles.dateOfBirth }).from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();
+    const profileAge = await db.select({ dateOfBirth: schema.healthProfiles.dateOfBirth, sex: schema.healthProfiles.sex }).from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();
     const isMinor = (() => { const dob = profileAge?.dateOfBirth; if (!dob || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dob)) return true; const birth = new Date(dob + 'T00:00:00'); if (Number.isNaN(birth.getTime())) return true; const now = new Date(); let age = now.getFullYear() - birth.getFullYear(); if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--; return age < 18 || age < 0; })();
     const targets = await readTargets(session.user.id);
     const rows = await db.select({
@@ -103,6 +103,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       date, targets: isMinor ? Object.fromEntries(Object.entries(targets).filter(([key]) => key !== 'calories')) : targets, nutrition: isMinor ? Object.fromEntries(Object.entries(nutrition).filter(([key]) => key !== 'calories')) : nutrition, foodsLogged: rows.length, isMinor,
       targetNotes: {
+        referenceSource: getNutrientReferenceMetadata(profileAge),
         valuesAreConfigurable: true,
         referenceNotPrescription: true,
         sodiumIsLimit: true,
