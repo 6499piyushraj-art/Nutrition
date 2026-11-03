@@ -11,7 +11,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dat
 
   try {
     // Fetch diary entries for the given date, user, and type
-    const entries = await db
+    const entries: Array<typeof schema.diaryEntries.$inferSelect> = await db
       .select()
       .from(schema.diaryEntries)
       .where(
@@ -25,7 +25,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dat
 
     // For each entry, fetch food entries with linked food data
     const result = await Promise.all(entries.map(async (entry) => {
-      const foodEntriesData = await db
+      const foodEntriesData: Array<{
+        id: string; quantity: number; energy_kcal: number | null; protein_g: number | null;
+        carbs_g: number | null; fat_g: number | null; fiber_g: number | null;
+        sodium_mg: number | null; sugar_g: number | null;
+        food: { id: string | null; description: string | null; brand_name: string | null;
+          energy_kcal: number | null; protein_g: number | null; carbs_g: number | null;
+          fat_g: number | null; default_serving_size: number | null; default_serving_unit: string | null } | null;
+      }> = await db
         .select({
           id: schema.foodEntries.id,
           quantity: schema.foodEntries.quantity,
