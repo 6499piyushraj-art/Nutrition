@@ -14,8 +14,9 @@ interface DashboardData {
     goal_carbs_g: number | null;
     goal_fat_g: number | null;
   } | null;
-  totals: { calories: number; protein: number; carbs: number; fat: number };
+  totals: { calories: number | null; protein: number | null; carbs: number | null; fat: number | null };
   hasProfile: boolean;
+  isMinor: boolean;
 }
 
 export default function DashboardPage() {
