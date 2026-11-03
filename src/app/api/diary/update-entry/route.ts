@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     };
     const baseValues = base?.nutrientValues || row.oldNutrients;
     const nutrientValues = baseValues
-      ? Object.fromEntries(Object.entries(baseValues).map(([key, value]) => [
+      ? Object.fromEntries(Object.entries(baseValues as Record<string, number>).map(([key, value]) => [
           key, Math.round(value * (base?.nutrientValues ? quantity : factor) * 1000) / 1000,
         ]))
       : null;
