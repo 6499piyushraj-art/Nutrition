@@ -14,7 +14,7 @@ export default function ReportsPage() {
   const current = today();
   const [from, setFrom] = useState(daysAgo(current, 29));
   const [to, setTo] = useState(current);
-  const [kind, setKind] = useState<'food' | 'measurements'>('food');
+  const [kind, setKind] = useState<'food' | 'measurements' | 'all'>('food');
   const [error, setError] = useState('');
 
   function exportFile(format: 'csv' | 'json') {
@@ -26,11 +26,11 @@ export default function ReportsPage() {
   }
 
   return <section className="space-y-4 pb-24">
-    <div><h1 className="text-2xl font-bold text-gray-900">Reports & Export</h1><p className="mt-1 text-sm text-gray-500">Download your saved food and measurement records for backup or review.</p></div>
+    <div><h1 className="text-2xl font-bold text-gray-900">Reports & Export</h1><p className="mt-1 text-sm text-gray-500">Download your food history, measurements or a full account backup.</p></div>
     <div className="space-y-3 rounded-xl bg-white p-4 shadow-sm">
       <label className="block text-sm font-medium text-gray-700">Export type
-        <select value={kind} onChange={(event)=>setKind(event.target.value as 'food' | 'measurements')} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-3 text-base text-gray-900">
-          <option value="food">Food history</option><option value="measurements">Height and weight measurements</option>
+        <select value={kind} onChange={(event)=>setKind(event.target.value as 'food' | 'measurements' | 'all')} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-3 text-base text-gray-900">
+          <option value="food">Food history</option><option value="measurements">Height and weight measurements</option><option value="all">Full account backup (JSON)</option>
         </select>
       </label>
       <label className="block text-sm font-medium text-gray-700">From<input type="date" value={from} max={today()} onChange={(e)=>setFrom(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-3"/></label>
@@ -42,6 +42,6 @@ export default function ReportsPage() {
       </div>
       <button onClick={()=>window.print()} className="min-h-[44px] w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700">Print this page / Save as PDF</button>
     </div>
-    <p className="text-xs text-gray-500">Exports contain only records from your account and selected date range. Unknown food nutrients remain blank. Measurement exports include only your own height and weight entries.</p>
+    <p className="text-xs text-gray-500">Exports contain only records from your account. Food, measurement and full-backup exports use the selected date range for dated records. Unknown food nutrients remain blank. Full backups exclude passwords and authentication tokens.</p>
   </section>;
 }
