@@ -122,7 +122,7 @@ export default function DiaryDatePage() {
       />
 
       {!loading && !loadError && entries.length > 0 && (
-        <div className={`grid ${isMinor ? 'grid-cols-3' : 'grid-cols-4'} gap-2 text-center mb-4">
+        <div className={`grid ${isMinor ? 'grid-cols-3' : 'grid-cols-4'} gap-2 text-center mb-4`}>
           {!isMinor && <div className="bg-orange-50 rounded-lg p-2">
             <p className="text-lg font-bold text-orange-600">{displayTotal(dayCal)}</p>
             <p className="text-[10px] text-gray-500">calories</p>
