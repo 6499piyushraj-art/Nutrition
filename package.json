@@ -26,23 +26,23 @@
     "recharts": "^3.8.1",
     "pg": "^8.16.3",
     "drizzle-kit": "^0.31.10",
-    "tsx": "^4.20.6"
-  },
-  "devDependencies": {
+    "tsx": "^4.20.6",
     "@tailwindcss/postcss": "^4",
+    "tailwindcss": "^4",
+    "typescript": "^5",
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.13",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
+    "@types/pg": "^8.15.5",
     "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react-dom": "^19"
+  },
+  "devDependencies": {
     "eslint": "^9",
-    "eslint-config-next": "16.2.3",
-    "tailwindcss": "^4",
-    "typescript": "^5",
-    "@types/pg": "^8.15.5"
+    "eslint-config-next": "16.2.3"
   },
   "engines": {
-    "node": ">=20"
+    "node": "20.x"
   }
 }
