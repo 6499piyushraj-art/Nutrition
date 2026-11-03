@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Sparkles, Loader2, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, Loader2, RotateCcw, CheckCircle2, Camera, X } from 'lucide-react';
 
 interface ParsedFood {
   description: string;
@@ -40,6 +40,7 @@ function AddFoodForm() {
   const searchParams = useSearchParams();
   const date = searchParams.get('date') || localDate();
   const [inputText, setInputText] = useState('');
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [parsedFood, setParsedFood] = useState<ParsedFood | null>(null);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -47,18 +48,33 @@ function AddFoodForm() {
 
   async function analyzeFood(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!inputText.trim() || parsing) return;
+    if ((!inputText.trim() && !selectedImage) || parsing) return;
+    if (selectedImage && (!['image/jpeg', 'image/png', 'image/webp'].includes(selectedImage.type) || selectedImage.size > 3 * 1024 * 1024)) {
+      setError('Choose a JPEG, PNG, or WebP photo under 3 MB.');
+      return;
+    }
     setParsing(true);
     setError('');
     setParsedFood(null);
 
     try {
+      let imageBase64: string | null = null;
+      if (selectedImage) {
+        const bytes = new Uint8Array(await selectedImage.arrayBuffer());
+        let binary = '';
+        for (let index = 0; index < bytes.length; index += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+        }
+        imageBase64 = btoa(binary);
+      }
       const res = await fetch('/api/ai/parse-food', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'text',
-          content: 'This is my complete food log. Read Hindi, Hinglish, or English, understand the portions, and estimate nutrition for ALL items together. Keep the description faithful to what I wrote. Food log: ' + inputText.trim(),
+          type: selectedImage ? 'image' : 'text',
+          content: imageBase64 || ('This is my complete food log. Read Hindi, Hinglish, or English, understand the portions, and estimate nutrition for ALL items together. Keep the description faithful to what I wrote. Food log: ' + inputText.trim()),
+          mediaType: selectedImage?.type,
+          context: inputText.trim() || 'Identify the visible food, estimate the portion conservatively, and clearly state uncertainty.',
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -130,7 +146,7 @@ function AddFoodForm() {
       </button>
 
       <h1 className="text-2xl font-bold text-gray-900">Log Food</h1>
-      <p className="text-sm text-gray-500 mt-1 mb-5">Jo khaya, apni language mein likho. Gemini calories aur nutrients estimate karega.</p>
+      <p className="text-sm text-gray-500 mt-1 mb-5">Food ki photo upload karo ya apni language mein likho. Gemini estimate dega; save karne se pehle aap review karoge.</p>
 
       <form onSubmit={analyzeFood}>
         <label htmlFor="food-log-input" className="block text-sm font-semibold text-gray-800 mb-2">
@@ -146,7 +162,15 @@ function AddFoodForm() {
           autoFocus
           className="w-full resize-y rounded-xl border-2 border-gray-300 bg-white px-4 py-3 text-base leading-6 text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
         />
-        <p className="text-xs text-gray-400 mt-1 mb-4">Quantity likhne se estimate behtar hoga. Example: “100g poha with peanuts”</p>
+        <p className="text-xs text-gray-400 mt-1 mb-4">Quantity likhne se estimate behtar ho sakta hai. Example: “100g poha with peanuts”</p>
+        <div className="mb-5 rounded-xl border border-dashed border-brand-300 bg-brand-50/60 p-4">
+          <label htmlFor="food-photo" className="flex cursor-pointer items-center gap-2 font-semibold text-brand-700">
+            <Camera size={20} /> Add food photo
+          </label>
+          <input id="food-photo" type="file" accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-sm text-gray-600" onChange={(event) => { const file = event.target.files?.[0] || null; setSelectedImage(file); setParsedFood(null); setError(''); }} />
+          <p className="mt-1 text-xs text-gray-500">JPEG, PNG or WebP, maximum 3 MB. The photo is sent for analysis and is not saved to an image library.</p>
+          {selectedImage && <div className="mt-2 flex items-center justify-between text-sm text-gray-700"><span className="truncate">{selectedImage.name}</span><button type="button" aria-label="Remove photo" onClick={() => setSelectedImage(null)} className="ml-2 rounded-lg p-2 text-gray-500"><X size={16} /></button></div>}
+        </div>
 
         <div className="mb-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Try an example</p>
@@ -162,8 +186,8 @@ function AddFoodForm() {
         )}
 
         {!parsedFood && (
-          <button type="submit" disabled={parsing || !inputText.trim()} className="w-full flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-4 text-lg font-semibold text-white active:bg-brand-800 disabled:opacity-50 min-h-[54px]">
-            {parsing ? <><Loader2 size={20} className="animate-spin" /> Processing food...</> : <><Sparkles size={20} /> Extract Nutrition</>}
+          <button type="submit" disabled={parsing || (!inputText.trim() && !selectedImage)} className="w-full flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-4 text-lg font-semibold text-white active:bg-brand-800 disabled:opacity-50 min-h-[54px]">
+            {parsing ? <><Loader2 size={20} className="animate-spin" /> Processing food...</> : <><Sparkles size={20} /> Analyse Food</>}
           </button>
         )}
       </form>
