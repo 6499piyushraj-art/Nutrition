@@ -9,6 +9,8 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
+      - key: DATABASE_URL
+        sync: false
       - key: NODE_ENV
         value: production
       - key: GEMINI_MODEL

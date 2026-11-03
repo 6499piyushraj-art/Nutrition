@@ -6,6 +6,7 @@ import express from "express";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import { GoogleGenAI, Type } from "@google/genai";
+import { Pool } from "pg";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "public");
@@ -17,6 +18,15 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "";
 const SESSION_COOKIE = "mynutri_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+const pool = process.env.DATABASE_URL ? new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+  application_name: "mynutri-ai"
+}) : null;
+
 
 app.set("trust proxy", 1);
 app.disable("x-powered-by");
@@ -155,12 +165,295 @@ app.use("/api", (req, res, next) => {
   return next();
 });
 
-app.get("/api/status", (_req, res) => {
+app.get("/api/status", async (_req, res) => {
+  let databaseConnected = false;
+  if (pool) {
+    try {
+      await pool.query("SELECT 1");
+      databaseConnected = true;
+    } catch (error) {
+      console.error("Database status check failed:", String(error?.code || "unknown"));
+    }
+  }
   res.json({
     ok: true,
     geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+    databaseConfigured: Boolean(pool),
+    databaseConnected,
     model: process.env.GEMINI_MODEL || "gemini-3.8-flash"
   });
+});
+
+
+
+const TARGET_KEYS = [
+  "caloriesKcal", "proteinG", "carbsG", "fatG", "omega3G", "omega6G",
+  "calciumMg", "phosphorusMg", "magnesiumMg", "potassiumMg", "sodiumMg", "chlorideMg",
+  "zincMg", "ironMg", "iodineMcg", "copperMcg", "manganeseMg", "seleniumMcg",
+  "fluorideMg", "chromiumMcg", "molybdenumMcg", "vitaminAMcg", "vitaminDIu",
+  "vitaminEMg", "vitaminKMcg", "vitaminCMg", "vitaminB1Mg", "vitaminB2Mg",
+  "vitaminB3Mg", "vitaminB5Mg", "vitaminB6Mg", "vitaminB7Mcg", "folateMcg", "vitaminB12Mcg"
+];
+const NUTRIENT_KEYS = [
+  "caloriesKcal", "proteinG", "carbsG", "fatG", "fiberG", "sugarG", "omega3G", "omega6G",
+  "sodiumMg", "calciumMg", "phosphorusMg", "magnesiumMg", "potassiumMg", "chlorideMg",
+  "zincMg", "ironMg", "iodineMcg", "copperMcg", "manganeseMg", "seleniumMcg",
+  "fluorideMg", "chromiumMcg", "molybdenumMcg", "vitaminAMcg", "vitaminDIu",
+  "vitaminEMg", "vitaminKMcg", "vitaminCMg", "vitaminB1Mg", "vitaminB2Mg",
+  "vitaminB3Mg", "vitaminB5Mg", "vitaminB6Mg", "vitaminB7Mcg", "folateMcg", "vitaminB12Mcg"
+];
+const REQUIRED_NUTRIENTS = ["caloriesKcal", "proteinG", "carbsG", "fatG"];
+const ALLOWED_MEALS = new Set(["Breakfast", "Lunch", "Dinner", "Snack"]);
+
+function databaseUnavailable(res) {
+  if (pool) return false;
+  res.status(503).json({ error: "Cloud storage is not configured on the server yet." });
+  return true;
+}
+
+function databaseFailure(res, error) {
+  console.error("Neon database operation failed:", String(error?.code || "unknown"));
+  if (!res.headersSent) {
+    res.status(503).json({ error: "Cloud storage is temporarily unavailable. Please try again; your current screen data was not changed." });
+  }
+}
+
+function normalizeTargets(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const targets = {};
+  for (const key of TARGET_KEYS) {
+    const value = Number(raw[key]);
+    if (!Number.isFinite(value) || value <= 0 || value > 10000000) return null;
+    targets[key] = value;
+  }
+  return targets;
+}
+
+function normalizeMeal(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const id = typeof raw.id === "string" ? raw.id.trim() : "";
+  const date = typeof raw.date === "string" ? raw.date : "";
+  const dateValue = new Date(date + "T00:00:00.000Z");
+  const meal = String(raw.meal || "");
+  const name = typeof raw.name === "string" ? raw.name.trim() : "";
+  const serving = typeof raw.serving === "string" ? raw.serving.trim() : "";
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+      !Number.isFinite(dateValue.getTime()) ||
+      dateValue.toISOString().slice(0, 10) !== date ||
+      !ALLOWED_MEALS.has(meal) ||
+      !name || name.length > 120 || !serving || serving.length > 120 ||
+      !raw.nutrition || typeof raw.nutrition !== "object" || Array.isArray(raw.nutrition)) {
+    return null;
+  }
+  const nutrition = {};
+  for (const key of NUTRIENT_KEYS) {
+    const value = raw.nutrition[key];
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100000000) {
+      nutrition[key] = value;
+    }
+  }
+  if (!REQUIRED_NUTRIENTS.every((key) => Object.hasOwn(nutrition, key))) return null;
+  const confidence = ["low", "medium", "high"].includes(raw.confidence) ? raw.confidence : "low";
+  const createdAtDate = raw.createdAt ? new Date(raw.createdAt) : new Date();
+  const createdAt = Number.isFinite(createdAtDate.getTime()) ? createdAtDate.toISOString() : new Date().toISOString();
+  return {
+    id, date, meal, name, serving, nutrition, confidence,
+    notes: String(raw.notes || "").slice(0, 600),
+    createdAt
+  };
+}
+
+function databaseMeal(row) {
+  const createdAt = row.created_at instanceof Date ? row.created_at.toISOString() : new Date(row.created_at).toISOString();
+  return {
+    id: row.id,
+    date: String(row.meal_date).slice(0, 10),
+    meal: row.meal_type,
+    name: row.name,
+    serving: row.serving,
+    nutrition: row.nutrition || {},
+    confidence: row.confidence,
+    notes: row.notes || "",
+    createdAt
+  };
+}
+
+async function insertMeal(client, entry, updateExisting) {
+  const sql = updateExisting
+    ? "INSERT INTO public.nutrition_meal_logs (id, profile_id, meal_date, meal_type, name, serving, nutrition, confidence, notes, created_at, updated_at) VALUES ($1, 'primary', $2::date, $3, $4, $5, $6::jsonb, $7, $8, $9::timestamptz, now()) ON CONFLICT (id) DO UPDATE SET meal_date = EXCLUDED.meal_date, meal_type = EXCLUDED.meal_type, name = EXCLUDED.name, serving = EXCLUDED.serving, nutrition = EXCLUDED.nutrition, confidence = EXCLUDED.confidence, notes = EXCLUDED.notes, created_at = EXCLUDED.created_at, updated_at = now() WHERE public.nutrition_meal_logs.profile_id = 'primary'"
+    : "INSERT INTO public.nutrition_meal_logs (id, profile_id, meal_date, meal_type, name, serving, nutrition, confidence, notes, created_at, updated_at) VALUES ($1, 'primary', $2::date, $3, $4, $5, $6::jsonb, $7, $8, $9::timestamptz, now()) ON CONFLICT (id) DO NOTHING";
+  await client.query(sql, [
+    entry.id, entry.date, entry.meal, entry.name, entry.serving,
+    JSON.stringify(entry.nutrition), entry.confidence, entry.notes, entry.createdAt
+  ]);
+}
+
+app.get("/api/state", async (_req, res) => {
+  if (databaseUnavailable(res)) return;
+  try {
+    const profileResult = await pool.query(
+      "SELECT targets FROM public.nutrition_profiles WHERE profile_id = 'primary'"
+    );
+    const logsResult = await pool.query(
+      "SELECT id, meal_date, meal_type, name, serving, nutrition, confidence, notes, created_at FROM public.nutrition_meal_logs WHERE profile_id = 'primary' ORDER BY meal_date DESC, created_at DESC LIMIT 5000"
+    );
+    const profile = profileResult.rows[0];
+    return res.json({
+      ok: true,
+      initialized: Boolean(profile),
+      targets: profile ? profile.targets : null,
+      logs: logsResult.rows.map(databaseMeal)
+    });
+  } catch (error) {
+    return databaseFailure(res, error);
+  }
+});
+
+app.put("/api/state", async (req, res) => {
+  if (databaseUnavailable(res)) return;
+  const targets = normalizeTargets(req.body?.targets);
+  const rawLogs = req.body?.logs;
+  if (!targets || !Array.isArray(rawLogs) || rawLogs.length > 5000) {
+    return res.status(400).json({ error: "The initial profile data is invalid." });
+  }
+  const logs = rawLogs.map(normalizeMeal);
+  if (logs.some((entry) => !entry)) {
+    return res.status(400).json({ error: "One or more saved meals are invalid. No data was imported." });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const inserted = await client.query(
+      "INSERT INTO public.nutrition_profiles (profile_id, targets) VALUES ('primary', $1::jsonb) ON CONFLICT (profile_id) DO NOTHING RETURNING profile_id",
+      [JSON.stringify(targets)]
+    );
+    if (!inserted.rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: "Cloud profile is already initialized. Reload to sync with it." });
+    }
+    for (const entry of logs) await insertMeal(client, entry, false);
+    await client.query("COMMIT");
+    return res.json({ ok: true, initialized: true, savedMeals: logs.length });
+  } catch (error) {
+    try { await client.query("ROLLBACK"); } catch {}
+    return databaseFailure(res, error);
+  } finally {
+    client.release();
+  }
+});
+
+app.put("/api/targets", async (req, res) => {
+  if (databaseUnavailable(res)) return;
+  const targets = normalizeTargets(req.body?.targets);
+  if (!targets) return res.status(400).json({ error: "The nutrition targets are invalid." });
+  try {
+    await pool.query(
+      "INSERT INTO public.nutrition_profiles (profile_id, targets) VALUES ('primary', $1::jsonb) ON CONFLICT (profile_id) DO UPDATE SET targets = EXCLUDED.targets, updated_at = now()",
+      [JSON.stringify(targets)]
+    );
+    return res.json({ ok: true });
+  } catch (error) {
+    return databaseFailure(res, error);
+  }
+});
+
+app.post("/api/meals", async (req, res) => {
+  if (databaseUnavailable(res)) return;
+  const entry = normalizeMeal(req.body);
+  if (!entry) return res.status(400).json({ error: "The meal entry is invalid. Check the date, meal type, and required nutrition values." });
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const profile = await client.query(
+      "SELECT profile_id FROM public.nutrition_profiles WHERE profile_id = 'primary'"
+    );
+    if (!profile.rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ error: "Your cloud profile is not initialized. Reload the app and try again." });
+    }
+    await insertMeal(client, entry, true);
+    await client.query("COMMIT");
+    return res.json({ ok: true, id: entry.id });
+  } catch (error) {
+    try { await client.query("ROLLBACK"); } catch {}
+    return databaseFailure(res, error);
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/api/meals/bulk", async (req, res) => {
+  if (databaseUnavailable(res)) return;
+  const rawLogs = req.body?.logs;
+  if (!Array.isArray(rawLogs) || rawLogs.length > 5000) {
+    return res.status(400).json({ error: "The meal sync payload is invalid." });
+  }
+  const logs = rawLogs.map(normalizeMeal);
+  if (logs.some((entry) => !entry)) return res.status(400).json({ error: "One or more meals could not be synced." });
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const entry of logs) await insertMeal(client, entry, false);
+    await client.query("COMMIT");
+    return res.json({ ok: true, syncedMeals: logs.length });
+  } catch (error) {
+    try { await client.query("ROLLBACK"); } catch {}
+    return databaseFailure(res, error);
+  } finally {
+    client.release();
+  }
+});
+
+app.delete("/api/meals/:id", async (req, res) => {
+  if (databaseUnavailable(res)) return;
+  try {
+    const result = await pool.query(
+      "DELETE FROM public.nutrition_meal_logs WHERE profile_id = 'primary' AND id = $1",
+      [String(req.params.id || "").slice(0, 100)]
+    );
+    return res.json({ ok: true, deleted: result.rowCount });
+  } catch (error) {
+    return databaseFailure(res, error);
+  }
+});
+
+app.put("/api/import", async (req, res) => {
+  if (databaseUnavailable(res)) return;
+  const targets = normalizeTargets(req.body?.targets);
+  const rawLogs = req.body?.logs;
+  if (!targets || !Array.isArray(rawLogs) || rawLogs.length > 5000) {
+    return res.status(400).json({ error: "The import file is invalid." });
+  }
+  const logs = rawLogs.map(normalizeMeal);
+  if (logs.some((entry) => !entry)) return res.status(400).json({ error: "One or more meals in the import are invalid. No cloud data was changed." });
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      "INSERT INTO public.nutrition_profiles (profile_id, targets) VALUES ('primary', $1::jsonb) ON CONFLICT (profile_id) DO UPDATE SET targets = EXCLUDED.targets, updated_at = now()",
+      [JSON.stringify(targets)]
+    );
+    await client.query("DELETE FROM public.nutrition_meal_logs WHERE profile_id = 'primary'");
+    for (const entry of logs) await insertMeal(client, entry, false);
+    await client.query("COMMIT");
+    return res.json({ ok: true, importedMeals: logs.length });
+  } catch (error) {
+    try { await client.query("ROLLBACK"); } catch {}
+    return databaseFailure(res, error);
+  } finally {
+    client.release();
+  }
+});
+
+app.delete("/api/state", async (_req, res) => {
+  if (databaseUnavailable(res)) return;
+  try {
+    await pool.query("DELETE FROM public.nutrition_profiles WHERE profile_id = 'primary'");
+    return res.json({ ok: true, cleared: true });
+  } catch (error) {
+    return databaseFailure(res, error);
+  }
 });
 
 const nutritionProperties = {
@@ -473,6 +766,17 @@ app.use((err, _req, res, _next) => {
   return res.status(400).json({ error: "The request could not be processed. Please try again." });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
+const server = app.listen(PORT, "0.0.0.0", async () => {
   console.log("MyNutri AI listening on port " + PORT);
+  if (!pool) {
+    console.error("Neon PostgreSQL is not configured; cloud persistence is unavailable.");
+    return;
+  }
+  try {
+    await pool.query("SELECT 1");
+    console.log("Neon PostgreSQL connection verified.");
+  } catch (error) {
+    console.error("Neon PostgreSQL connection failed:", String(error?.code || "unknown"));
+    server.close(() => process.exit(1));
+  }
 });

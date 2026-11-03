@@ -99,6 +99,60 @@ function saveState() {
   }
 }
 
+async function apiRequest(url, options) {
+  const request = Object.assign({ credentials: "same-origin", headers: {} }, options || {});
+  if (request.body && !request.headers["Content-Type"]) {
+    request.headers["Content-Type"] = "application/json";
+  }
+  const response = await fetch(url, request);
+  const result = await response.json().catch(function () { return {}; });
+  if (response.status === 401) {
+    window.location.assign("/login");
+    throw new Error("Your session has expired. Please sign in again.");
+  }
+  if (!response.ok) throw new Error(result.error || "The cloud request failed. Please try again.");
+  return result;
+}
+
+async function initializeRemoteState() {
+  const localState = structuredClone(state);
+  let remote = await apiRequest("/api/state");
+  if (!remote.initialized) {
+    try {
+      await apiRequest("/api/state", {
+        method: "PUT",
+        body: JSON.stringify(localState)
+      });
+      return;
+    } catch (error) {
+      if (!/already initialized/i.test(String(error.message || ""))) throw error;
+      remote = await apiRequest("/api/state");
+    }
+  }
+
+  const remoteLogs = Array.isArray(remote.logs) ? remote.logs.filter(isValidLog) : [];
+  const remoteIds = new Set(remoteLogs.map(function (entry) { return entry.id; }));
+  const localOnly = localState.logs.filter(function (entry) { return !remoteIds.has(entry.id); });
+  if (localOnly.length) {
+    await apiRequest("/api/meals/bulk", {
+      method: "POST",
+      body: JSON.stringify({ logs: localOnly })
+    });
+  }
+
+  const merged = new Map();
+  remoteLogs.forEach(function (entry) { merged.set(entry.id, entry); });
+  localOnly.forEach(function (entry) { merged.set(entry.id, entry); });
+  state = {
+    targets: remote.targets || localState.targets,
+    logs: Array.from(merged.values()).sort(function (a, b) {
+      return String(b.date).localeCompare(String(a.date)) ||
+        String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
+    }).slice(0, 5000)
+  };
+  saveState();
+}
+
 function localDate(date) {
   const d = date || new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -528,7 +582,7 @@ function setPhoto(file) {
   scheduleAutoAnalysis(900);
 }
 
-function saveMeal(event) {
+async function saveMeal(event) {
   event.preventDefault();
   if (!pendingAnalysis) {
     showToast("Analyze a meal before saving.");
@@ -570,6 +624,15 @@ function saveMeal(event) {
     notes: String(pendingAnalysis.notes || "").slice(0, 600),
     createdAt: new Date().toISOString()
   };
+  try {
+    await apiRequest("/api/meals", {
+      method: "POST",
+      body: JSON.stringify(entry)
+    });
+  } catch (error) {
+    showToast(error.message || "Could not save this meal to cloud storage.");
+    return;
+  }
   state.logs.push(entry);
   saveState();
   clearReview();
@@ -582,7 +645,7 @@ function saveMeal(event) {
   renderDashboard(entry.date);
   renderMicronutrients(entry.date);
   renderHistory();
-  showToast("Meal saved to your local food log.");
+  showToast("Meal saved to your cloud food log.");
   setView("dashboard");
 }
 
@@ -621,7 +684,7 @@ function downloadFile(content, fileName, type) {
   URL.revokeObjectURL(url);
 }
 
-function saveTargets(event) {
+async function saveTargets(event) {
   event.preventDefault();
   const next = {};
   for (const key of Object.keys(DEFAULTS.targets)) {
@@ -634,20 +697,35 @@ function saveTargets(event) {
     }
     next[key] = value;
   }
+  try {
+    await apiRequest("/api/targets", {
+      method: "PUT",
+      body: JSON.stringify({ targets: next })
+    });
+  } catch (error) {
+    showToast(error.message || "Could not save your cloud targets.");
+    return;
+  }
   state.targets = next;
   saveState();
   renderDashboard(document.getElementById("dashboard-date").value || localDate());
   renderMicronutrients(document.getElementById("nutrients-date").value || localDate());
   updateEnergyNote();
-  document.getElementById("target-save-status").textContent = "Targets saved on this device.";
+  document.getElementById("target-save-status").textContent = "Targets saved to your cloud profile.";
   showToast("Your reference targets were updated.");
 }
 
 async function deleteEntry(id) {
   const entry = state.logs.find(function (item) { return item.id === id; });
   if (!entry) return;
-  const ok = await showConfirm("Delete this meal?", "Remove “" + entry.name + "” from this browser's food history?", "Delete meal");
+  const ok = await showConfirm("Delete this meal?", "Remove “" + entry.name + "” from your cloud food history?", "Delete meal");
   if (!ok) return;
+  try {
+    await apiRequest("/api/meals/" + encodeURIComponent(id), { method: "DELETE" });
+  } catch (error) {
+    showToast(error.message || "Could not delete this cloud meal.");
+    return;
+  }
   state.logs = state.logs.filter(function (item) { return item.id !== id; });
   saveState();
   renderAll();
@@ -655,13 +733,19 @@ async function deleteEntry(id) {
 }
 
 async function clearLocalData() {
-  const ok = await showConfirm("Clear all local data?", "This removes every saved meal and resets your reference targets in this browser. Export a backup first if you need one.", "Clear all data");
+  const ok = await showConfirm("Clear all cloud data?", "This removes every saved meal and resets your cloud nutrition targets. Export a backup first if you need one.", "Clear all data");
   if (!ok) return;
+  try {
+    await apiRequest("/api/state", { method: "DELETE" });
+  } catch (error) {
+    showToast(error.message || "Could not clear your cloud food history.");
+    return;
+  }
   state = structuredClone(DEFAULTS);
   saveState();
   renderAll();
   renderSettings();
-  showToast("Local data has been cleared.");
+  showToast("Cloud data has been cleared.");
 }
 
 function renderAll() {
@@ -760,12 +844,16 @@ async function importJson(event) {
         createdAt: String(entry.createdAt || "")
       };
     });
-    const ok = await showConfirm("Import local data?", "This will replace the current local meals and targets with " + logs.length + " valid meal entries from the selected file.", "Import data");
+    const ok = await showConfirm("Replace cloud data?", "This will replace your cloud meals and targets with " + logs.length + " valid meal entries from the selected file.", "Import data");
     if (!ok) return;
+    await apiRequest("/api/import", {
+      method: "PUT",
+      body: JSON.stringify({ targets: targets, logs: logs.slice(-5000) })
+    });
     state = { targets: targets, logs: logs.slice(-5000) };
     saveState();
     renderAll();
-    showToast("Data imported.");
+    showToast("Cloud data imported.");
   } catch (error) {
     showToast(error.message || "Could not import that file.");
   }
@@ -781,12 +869,17 @@ async function checkStatus() {
       return;
     }
     const status = await response.json();
-    if (!response.ok || !status.geminiConfigured) {
-      pill.innerHTML = "<span></span> Gemini needs setup";
+    if (!response.ok || !status.geminiConfigured || !status.databaseConnected) {
+      const message = !status.geminiConfigured ? "Gemini needs setup" : "Cloud storage unavailable";
+      pill.innerHTML = "<span></span> " + message;
       pill.classList.add("status-warning");
-      showToast("Add GEMINI_API_KEY in Render's private Environment settings to enable AI analysis.");
+      if (!status.geminiConfigured) {
+        showToast("Gemini AI analysis needs configuration in the hosting environment.");
+      } else if (!status.databaseConnected) {
+        showToast("Neon cloud storage is not reachable. Saved changes are not being synced.");
+      }
     } else {
-      pill.innerHTML = "<span></span> Gemini connected";
+      pill.innerHTML = "<span></span> Gemini + Neon connected";
       pill.classList.remove("status-warning");
     }
   } catch {
@@ -795,7 +888,7 @@ async function checkStatus() {
   }
 }
 
-function init() {
+async function init() {
   const today = localDate();
   document.getElementById("dashboard-date").value = today;
   document.getElementById("entry-date").value = today;
@@ -804,6 +897,12 @@ function init() {
   document.getElementById("sidebar-date").textContent = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(new Date());
   bindEvents();
   renderAll();
+  try {
+    await initializeRemoteState();
+    renderAll();
+  } catch (error) {
+    showToast(error.message || "Cloud sync is unavailable. Your existing browser copy has been kept.");
+  }
   checkStatus();
 }
 
