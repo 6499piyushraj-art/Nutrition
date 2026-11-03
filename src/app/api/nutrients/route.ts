@@ -63,7 +63,9 @@ export async function GET(request: Request) {
   const defaultDate = String(now.getFullYear()) + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
   const date = searchParams.get('date') || defaultDate;
   try {
-    const profileAge = await db.select({ dateOfBirth: schema.healthProfiles.dateOfBirth }).from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();\n    const isMinor = (() => { const dob = profileAge?.dateOfBirth; if (!dob || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dob)) return false; const birth = new Date(dob + 'T00:00:00'); const now = new Date(); let age = now.getFullYear() - birth.getFullYear(); if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--; return age >= 0 && age < 18; })();\n    const targets = await readTargets(session.user.id);
+    const profileAge = await db.select({ dateOfBirth: schema.healthProfiles.dateOfBirth }).from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();
+    const isMinor = (() => { const dob = profileAge?.dateOfBirth; if (!dob || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dob)) return false; const birth = new Date(dob + 'T00:00:00'); const now = new Date(); let age = now.getFullYear() - birth.getFullYear(); if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--; return age >= 0 && age < 18; })();
+    const targets = await readTargets(session.user.id);
     const rows = await db.select({
       energyKcal: schema.foodEntries.energyKcal,
       proteinG: schema.foodEntries.proteinG,
@@ -134,8 +136,10 @@ export async function POST(request: Request) {
       return [spec.key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
     }));
     const allowed = new Set(NUTRIENT_SPECS.map((item) => item.key));
+    const dob = profile?.dateOfBirth;
+    const minor = typeof dob === 'string' && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dob) && (() => { const birth = new Date(dob + 'T00:00:00'); const now = new Date(); let age = now.getFullYear() - birth.getFullYear(); if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--; return age >= 0 && age < 18; })();
     for (const [key, value] of Object.entries(body.targets as Record<string, unknown>)) {
-      if (!allowed.has(key as never)) continue;
+      if (!allowed.has(key as never) || (minor && key === 'calories')) continue;
       if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 10000000) {
         return NextResponse.json({ error: 'Target values must be finite, non-negative numbers.' }, { status: 400 });
       }
