@@ -80,11 +80,7 @@ export async function GET(request: Request) {
         )),
         db.select({ foodEntry: schema.foodEntries, diaryDate: schema.diaryEntries.date })
           .from(schema.foodEntries).innerJoin(schema.diaryEntries, eq(schema.foodEntries.diaryEntryId, schema.diaryEntries.id))
-          .where(and(
-            eq(schema.diaryEntries.userId, session.user.id),
-            gte(schema.diaryEntries.date, from),
-            lte(schema.diaryEntries.date, to),
-          )),
+          .where(eq(schema.diaryEntries.userId, session.user.id)),
         db.select({ exercise: schema.exercises, diaryDate: schema.diaryEntries.date })
           .from(schema.exercises).innerJoin(schema.diaryEntries, eq(schema.exercises.diaryEntryId, schema.diaryEntries.id))
           .where(and(
@@ -111,14 +107,14 @@ export async function GET(request: Request) {
         exportType: 'MyNutri full account backup',
         exportedAt: new Date().toISOString(),
         dateRange: 'all dates',
-        note: 'This is a full account backup across all dates. Password hashes, session tokens and authentication secrets are excluded.'
+        note: 'This is a full account backup across all dates. Password hashes, session tokens and authentication secrets are excluded.',
         account, profile, nutrientTargets: targets, foods, foodTags, foodTagLinks,
         foodServings, diaryEntries, foodEntries, exercises, measurements, meals,
         mealItems, mealTags, journalEntries,
       }, null, 2), {
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
-          'Content-Disposition': `attachment; filename="mynutri-full-backup-${from}-${to}.json"`,
+          'Content-Disposition': `attachment; filename="mynutri-full-backup-${new Date().toISOString().slice(0,10)}.json"`,
           'Cache-Control': 'no-store',
         },
       });
