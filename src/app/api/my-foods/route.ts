@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       conditions.push(like(schema.foods.description, `%${query}%`));
     }
 
-    let foods = db
+    let foods = await db
       .select({
         id: schema.foods.id,
         description: schema.foods.description,
