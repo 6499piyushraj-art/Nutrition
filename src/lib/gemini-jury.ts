@@ -1,3 +1,4 @@
+import { GoogleGenAI } from '@google/genai';
 import { createHash } from 'node:crypto';
 
 // Seven text+image-capable Gemini API models, ordered by preferred fallback.
@@ -12,6 +13,7 @@ export const GEMINI_JURY_MODELS = [
 ] as const;
 
 type JsonObject = Record<string, unknown>;
+type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
 type Candidate = { model: string; json: JsonObject; attemptedModels: string[] };
 const NUTRIENT_KEYS = [
   'omega3', 'calcium', 'iron', 'zinc', 'vitamin_d',
@@ -139,7 +141,7 @@ function consensus(rows: JsonObject[]): JsonObject {
 }
 
 async function callGemini(
-  parts: Array<Record<string, unknown>>,
+  parts: GeminiPart[],
   systemPrompt: string,
   offset: number,
 ): Promise<Candidate> {
@@ -157,39 +159,20 @@ async function callGemini(
     for (let keyOffset = 0; keyOffset < apiKeys.length; keyOffset += 1) {
       const apiKey = apiKeys[(offset + keyOffset) % apiKeys.length];
       try {
-        const response = await fetch(
-          'https://generativelanguage.googleapis.com/v1beta/models/' +
-            encodeURIComponent(model) + ':generateContent',
-          {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              'x-goog-api-key': apiKey,
-            },
-            signal: AbortSignal.timeout(12000),
-            body: JSON.stringify({
-              system_instruction: { parts: [{ text: systemPrompt }] },
-              contents: [{ parts }],
-              generationConfig: {
-                temperature: 0.15,
-                maxOutputTokens: 1600,
-                responseMimeType: 'application/json',
-              },
-            }),
+        const ai = new GoogleGenAI({
+          apiKey,
+          httpOptions: { timeout: 12000 },
+        });
+        const response = await ai.models.generateContent({
+          model,
+          contents: parts,
+          config: {
+            systemInstruction: systemPrompt,
+            maxOutputTokens: 1600,
+            responseMimeType: 'application/json',
           },
-        );
-
-        if (!response.ok) {
-          const detail = await response.json().catch(() => null) as { error?: { message?: string } } | null;
-          lastError = model + ' returned HTTP ' + response.status +
-            (detail?.error?.message ? ': ' + detail.error.message : '');
-          continue;
-        }
-
-        const data = await response.json() as {
-          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-        };
-        const output = data.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('').trim();
+        });
+        const output = response.text?.trim() || '';
         if (!output) {
           lastError = model + ' returned no text';
           continue;
@@ -240,9 +223,9 @@ export async function runGeminiNutritionJury(
     };
   }
 
-  const parts: Array<Record<string, unknown>> = input.type === 'image'
+  const parts: GeminiPart[] = input.type === 'image'
     ? [
-        { inline_data: { mime_type: input.mediaType || 'image/jpeg', data: input.content } },
+        { inlineData: { mimeType: input.mediaType || 'image/jpeg', data: input.content } },
         { text: 'Food context: ' + (input.context || 'Identify the food and estimate visible portion.') },
       ]
     : [{ text: 'User food log: ' + input.content }];
