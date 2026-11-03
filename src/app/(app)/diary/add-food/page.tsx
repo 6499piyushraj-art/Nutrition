@@ -23,6 +23,7 @@ interface ParsedFood {
   food_id?: string | null;
   fdc_id?: number | null;
   source?: string | null;
+  data_type?: string | null;
 }
 
 interface ManualFood {
@@ -207,6 +208,7 @@ function AddFoodForm() {
       food_id: null,
       fdc_id: food.fdc_id,
       source: 'usda_fdc',
+      data_type: food.data_type || 'FoodData Central',
     });
     setSelectedQuantity(1);
     setInputText('');
