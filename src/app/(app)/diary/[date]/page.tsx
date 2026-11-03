@@ -155,7 +155,6 @@ export default function DiaryDatePage() {
             + Log Food
           </Link>
         </div>
-        </div>
 
         {loading ? (
           <p className="text-center text-gray-500 py-8">Loading food log...</p>
