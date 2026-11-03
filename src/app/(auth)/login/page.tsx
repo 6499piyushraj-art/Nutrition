@@ -47,8 +47,8 @@ function LoginForm() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <img src="/nutrients-mark.svg" alt="Nutrients" className="w-14 h-14" />
-            <h1 className="text-4xl font-[var(--font-bricolage)] font-extrabold text-gray-900 tracking-tight">Nutrients</h1>
+            <img src="/mynutri-mark.svg" alt="MyNutri" className="w-14 h-14" />
+            <h1 className="text-4xl font-[var(--font-bricolage)] font-extrabold text-gray-900 tracking-tight">MyNutri</h1>
           </div>
           <p className="text-gray-500 text-sm italic">eat well. feel balanced.</p>
           <p className="text-gray-600 mt-4 text-base">Sign in to your account</p>
