@@ -44,9 +44,11 @@ export async function GET(request: Request) {
   const today = [now.getFullYear(), String(now.getMonth()+1).padStart(2,'0'), String(now.getDate()).padStart(2,'0')].join('-');
   const from = params.get('from') || (() => { const date = new Date(today + 'T00:00:00.000Z'); date.setUTCDate(date.getUTCDate()-29); return date.toISOString().slice(0,10); })();
   const to = params.get('to') || today;
-  if (!validIsoDate(from) || !validIsoDate(to) || from > to) return NextResponse.json({ error: 'Use a valid date range in YYYY-MM-DD format.' }, { status: 400 });
-  const span = (new Date(to + 'T00:00:00.000Z').getTime() - new Date(from + 'T00:00:00.000Z').getTime()) / 86400000;
-  if (span > 365) return NextResponse.json({ error: 'Export range cannot exceed 366 days.' }, { status: 400 });
+  if (kind !== 'all') {
+    if (!validIsoDate(from) || !validIsoDate(to) || from > to) return NextResponse.json({ error: 'Use a valid date range in YYYY-MM-DD format.' }, { status: 400 });
+    const span = (new Date(to + 'T00:00:00.000Z').getTime() - new Date(from + 'T00:00:00.000Z').getTime()) / 86400000;
+    if (span > 365) return NextResponse.json({ error: 'Export range cannot exceed 366 days.' }, { status: 400 });
+  }
 
   try {
     if (kind === 'all') {
@@ -75,8 +77,6 @@ export async function GET(request: Request) {
           .where(eq(schema.foods.userId, session.user.id)),
         db.select().from(schema.diaryEntries).where(and(
           eq(schema.diaryEntries.userId, session.user.id),
-          gte(schema.diaryEntries.date, from),
-          lte(schema.diaryEntries.date, to),
         )),
         db.select({ foodEntry: schema.foodEntries, diaryDate: schema.diaryEntries.date })
           .from(schema.foodEntries).innerJoin(schema.diaryEntries, eq(schema.foodEntries.diaryEntryId, schema.diaryEntries.id))
@@ -94,8 +94,6 @@ export async function GET(request: Request) {
           )),
         db.select().from(schema.measurements).where(and(
           eq(schema.measurements.userId, session.user.id),
-          gte(schema.measurements.date, from),
-          lte(schema.measurements.date, to),
         )),
         db.select().from(schema.meals).where(eq(schema.meals.userId, session.user.id)),
         db.select({ item: schema.mealItems, mealName: schema.meals.name })
@@ -106,16 +104,14 @@ export async function GET(request: Request) {
           .where(eq(schema.meals.userId, session.user.id)),
         db.select().from(schema.journalEntries).where(and(
           eq(schema.journalEntries.userId, session.user.id),
-          gte(schema.journalEntries.entryDate, from),
-          lte(schema.journalEntries.entryDate, to),
         )),
       ]);
 
       return new NextResponse(JSON.stringify({
         exportType: 'MyNutri full account backup',
         exportedAt: new Date().toISOString(),
-        dateRange: { from, to },
-        note: 'Password hashes and authentication tokens are excluded. Dated diary, journal, measurement and exercise records are limited to the selected date range.',
+        dateRange: 'all dates',
+        note: 'This is a full account backup across all dates. Password hashes, session tokens and authentication secrets are excluded.'
         account, profile, nutrientTargets: targets, foods, foodTags, foodTagLinks,
         foodServings, diaryEntries, foodEntries, exercises, measurements, meals,
         mealItems, mealTags, journalEntries,
