@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateKnownValues, scaleNutrients, validIsoDate } from '../src/lib/nutrition-calculator';
+import { aggregateKnownValues, ageFromDateOfBirth, isUnder18OrUnknown, isVerifiedAdult, scaleNutrients, validIsoDate } from '../src/lib/nutrition-calculator';
 import { getDefaultNutrientTargets, getNutrientReferenceMetadata } from '../src/lib/nutrients';
 
 test('scales per-serving values proportionally', () => {
@@ -69,4 +69,14 @@ test('uses the ICMR-NIN 2020 16–18 reference band for boys', () => {
 test('falls back to unclassified references for invalid birth dates', () => {
   const metadata = getNutrientReferenceMetadata({ dateOfBirth: '2009-02-30', sex: 'M' });
   assert.equal(metadata.populationGroup, 'General starting values; age/sex-specific reference not selected');
+});
+
+
+test('classifies missing, malformed and underage birth dates conservatively', () => {
+  assert.equal(ageFromDateOfBirth('2009-01-01', new Date('2026-11-03T12:00:00Z')), 17);
+  assert.equal(ageFromDateOfBirth('2009-02-30', new Date('2026-11-03T12:00:00Z')), null);
+  assert.equal(isUnder18OrUnknown(null), true);
+  assert.equal(isUnder18OrUnknown('2009-01-01'), true);
+  assert.equal(isVerifiedAdult('2000-01-01'), true);
+  assert.equal(isVerifiedAdult('2010-01-01'), false);
 });
