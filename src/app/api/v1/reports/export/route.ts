@@ -83,11 +83,7 @@ export async function GET(request: Request) {
           .where(eq(schema.diaryEntries.userId, session.user.id)),
         db.select({ exercise: schema.exercises, diaryDate: schema.diaryEntries.date })
           .from(schema.exercises).innerJoin(schema.diaryEntries, eq(schema.exercises.diaryEntryId, schema.diaryEntries.id))
-          .where(and(
-            eq(schema.diaryEntries.userId, session.user.id),
-            gte(schema.diaryEntries.date, from),
-            lte(schema.diaryEntries.date, to),
-          )),
+          .where(eq(schema.diaryEntries.userId, session.user.id)),
         db.select().from(schema.measurements).where(and(
           eq(schema.measurements.userId, session.user.id),
         )),
