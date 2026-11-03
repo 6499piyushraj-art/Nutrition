@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get('date') || '2026-04-13';
 
-  const entries = await db.select().from(schema.diaryEntries)
+  const entries: Array<typeof schema.diaryEntries.$inferSelect> = await db.select().from(schema.diaryEntries)
     .where(and(
       eq(schema.diaryEntries.date, date),
       eq(schema.diaryEntries.userId, session.user.id),
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     )).all();
 
   const entriesWithFoods = await Promise.all(entries.map(async (entry) => {
-    const foodEntriesData = await db.select({
+    const foodEntriesData: Array<{ id: string; quantity: number; energy_kcal: number | null; food_id: string | null; food_description: string | null }> = await db.select({
       id: schema.foodEntries.id,
       quantity: schema.foodEntries.quantity,
       energy_kcal: schema.foodEntries.energyKcal,
