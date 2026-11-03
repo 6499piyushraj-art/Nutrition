@@ -35,6 +35,7 @@ interface Props {
   userId: string;
   userEmail: string;
   userName: string;
+  isMinor?: boolean;
 }
 
 export default function ProfileForm({ profile, userId, userEmail, userName, isMinor = false }: Props) {
@@ -205,7 +206,8 @@ export default function ProfileForm({ profile, userId, userEmail, userName, isMi
         </div>
       </div>
 
-      {/* Weight Journey */}
+      {!isMinor && (
+        <>
       <div className="bg-white rounded-2xl p-5 shadow-sm">
         <h2 className="font-semibold text-gray-800 mb-3">Weight Journey</h2>
         <div className="space-y-3">
@@ -278,15 +280,21 @@ export default function ProfileForm({ profile, userId, userEmail, userName, isMi
         </div>
       </div>
 
-      }\n\n      {/* Daily Targets */}
+
+        </>
+      )}
+
+      {/* Daily Targets */}
       <div className="bg-white rounded-2xl p-5 shadow-sm">
         <h2 className="font-semibold text-gray-800 mb-3">Daily Targets</h2>
         <div className="space-y-3">
+          {!isMinor && (
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Calories</label>
             <input type="number" value={form.daily_calorie_goal} onChange={(e) => update('daily_calorie_goal', e.target.value)}
               className="w-full rounded-lg border-2 border-orange-200 px-3 py-3 text-lg font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
           </div>
+          )}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Protein (g)</label>
