@@ -6,6 +6,8 @@ import { validIsoDate } from '@/lib/nutrition-calculator';
 
 export const dynamic = 'force-dynamic';
 
+type MeasurementExportRow = { date: string; type: string; value: number; unit: string | null; notes: string | null };
+
 type ExportRow = {
   date: string;
   meal: string | null;
@@ -47,7 +49,7 @@ export async function GET(request: Request) {
 
   try {
     if (kind === 'measurements') {
-      const rows = await db.select({
+      const rows: MeasurementExportRow[] = await db.select({
         date: schema.measurements.date,
         type: schema.measurements.type,
         value: schema.measurements.value,
@@ -58,7 +60,7 @@ export async function GET(request: Request) {
           eq(schema.measurements.userId, session.user.id),
           gte(schema.measurements.date, from),
           lte(schema.measurements.date, to),
-        )).orderBy(asc(schema.measurements.date));
+        )).orderBy(asc(schema.measurements.date)) as MeasurementExportRow[];
 
       if (format === 'json') {
         return new NextResponse(JSON.stringify({ kind, from, to, records: rows }, null, 2), {
