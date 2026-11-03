@@ -2,14 +2,19 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { eq, and } from 'drizzle-orm';
+import { isUnder18OrUnknown, validIsoDate } from '@/lib/nutrition-calculator';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ date: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { date } = await params;
+  if (!validIsoDate(date)) return NextResponse.json({ error: 'date must be YYYY-MM-DD.' }, { status: 400 });
 
   try {
+    const profile = await db.select({ dateOfBirth: schema.healthProfiles.dateOfBirth })
+      .from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();
+    const isMinor = isUnder18OrUnknown(profile?.dateOfBirth);
     // Fetch diary entries for the given date, user, and type
     const entries: Array<typeof schema.diaryEntries.$inferSelect> = await db
       .select()
@@ -31,7 +36,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dat
         sodium_mg: number | null; sugar_g: number | null;
         food: { id: string | null; description: string | null; brand_name: string | null;
           energy_kcal: number | null; protein_g: number | null; carbs_g: number | null;
-          fat_g: number | null; default_serving_size: number | null; default_serving_unit: string | null } | null;
+          fat_g: number | null; fiber_g: number | null; sodium_mg: number | null; sugar_g: number | null;
+          default_serving_size: number | null; default_serving_unit: string | null } | null;
       }> = await db
         .select({
           id: schema.foodEntries.id,
@@ -51,6 +57,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dat
             protein_g: schema.foods.proteinG,
             carbs_g: schema.foods.carbohydrateG,
             fat_g: schema.foods.totalFatG,
+            fiber_g: schema.foods.dietaryFiberG,
+            sodium_mg: schema.foods.sodiumMg,
+            sugar_g: schema.foods.totalSugarsG,
             default_serving_size: schema.foods.defaultServingSize,
             default_serving_unit: schema.foods.defaultServingUnit,
           },
@@ -86,6 +95,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dat
                 protein_g: fe.food.protein_g,
                 carbs_g: fe.food.carbs_g,
                 fat_g: fe.food.fat_g,
+                fiber_g: fe.food.fiber_g,
+                sodium_mg: fe.food.sodium_mg,
+                sugar_g: fe.food.sugar_g,
                 default_serving_size: fe.food.default_serving_size,
                 default_serving_unit: fe.food.default_serving_unit,
               }
@@ -94,7 +106,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dat
       };
     }));
 
-    const response = NextResponse.json({ entries: result });
+    const response = NextResponse.json({ entries: result, isMinor });
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     response.headers.set('Pragma', 'no-cache');
     return response;
