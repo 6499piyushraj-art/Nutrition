@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     await db.update(schema.foodEntries).set({
       quantity, ...nutrients, nutrientValues, nutrientSource: base?.nutrientSource || row.oldSource || null,
     }).where(eq(schema.foodEntries.id, foodEntryId)).run();
-    if (diaryEntryId) recalcDiaryTotals(diaryEntryId);
+    if (diaryEntryId) await recalcDiaryTotals(diaryEntryId);
     return NextResponse.json({ success: true, quantity });
   } catch (err) {
     return NextResponse.json({ error: 'Server error: ' + (err instanceof Error ? err.message : 'Unknown') }, { status: 500 });
