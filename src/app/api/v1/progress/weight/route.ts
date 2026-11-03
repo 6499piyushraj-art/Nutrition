@@ -2,13 +2,16 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
-import { validIsoDate } from '@/lib/nutrition-calculator';
+import { isVerifiedAdult, validIsoDate } from '@/lib/nutrition-calculator';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const profile = await db.select({ dateOfBirth: schema.healthProfiles.dateOfBirth }).from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();
+  if (!isVerifiedAdult(profile?.dateOfBirth)) return NextResponse.json({ error: 'Weight history is not enabled for accounts without a verified adult age.' }, { status: 403 });
+
   const { searchParams } = new URL(request.url);
   const from = searchParams.get('from'), to = searchParams.get('to');
   if ((from && !validIsoDate(from)) || (to && !validIsoDate(to))) {
