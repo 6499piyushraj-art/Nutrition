@@ -7,6 +7,7 @@ import WeightChart from '@/components/profile/WeightChart';
 import TagManager from '@/components/profile/TagManager';
 import LogoutButton from '@/components/profile/LogoutButton';
 import ChangePassword from '@/components/profile/ChangePassword';
+import DeleteAccountButton from '@/components/profile/DeleteAccountButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,6 +107,9 @@ export default async function ProfilePage() {
       <div className="mt-8">
         <ChangePassword />
       </div>
+
+      {/* Account deletion */}
+      <div className="mt-4"><DeleteAccountButton /></div>
 
       {/* Logout */}
       <div className="mt-4">
