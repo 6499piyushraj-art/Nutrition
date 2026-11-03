@@ -2,73 +2,72 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { recalcDiaryTotals } from '@/lib/db/helpers';
-import { eq } from 'drizzle-orm';
+import { scaleNutrients } from '@/lib/nutrition-calculator';
+import { and, eq } from 'drizzle-orm';
 
-function scaleNullable(value: number | null, quantity: number): number | null {
-  return value === null || value === undefined ? null : Math.round(value * quantity * 10) / 10;
-}
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const { foodEntryId, diaryEntryId, quantity } = await request.json();
-  if (!foodEntryId || typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0) {
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  let body: Record<string, unknown>;
+  try { body = await request.json() as Record<string, unknown>; }
+  catch { return NextResponse.json({ error: 'Request body must be valid JSON.' }, { status: 400 }); }
+
+  const foodEntryId = body.foodEntryId;
+  const quantity = body.quantity;
+  if (typeof foodEntryId !== 'string' || !foodEntryId.trim() || typeof quantity !== 'number'
+      || !Number.isFinite(quantity) || quantity <= 0 || quantity > 100000) {
+    return NextResponse.json({ error: 'A food entry and valid positive quantity are required.' }, { status: 400 });
   }
+
   try {
     const row = await db.select({
-      oldQuantity: schema.foodEntries.quantity,
-      oldEnergy: schema.foodEntries.energyKcal,
-      oldProtein: schema.foodEntries.proteinG,
-      oldCarbs: schema.foodEntries.carbsG,
-      oldFat: schema.foodEntries.fatG,
-      oldFiber: schema.foodEntries.fiberG,
-      oldSodium: schema.foodEntries.sodiumMg,
-      oldSugar: schema.foodEntries.sugarG,
-      oldNutrients: schema.foodEntries.nutrientValues,
+      diaryEntryId: schema.foodEntries.diaryEntryId, oldQuantity: schema.foodEntries.quantity,
+      oldEnergy: schema.foodEntries.energyKcal, oldProtein: schema.foodEntries.proteinG,
+      oldCarbs: schema.foodEntries.carbsG, oldFat: schema.foodEntries.fatG,
+      oldFiber: schema.foodEntries.fiberG, oldSodium: schema.foodEntries.sodiumMg,
+      oldSugar: schema.foodEntries.sugarG, oldNutrients: schema.foodEntries.nutrientValues,
       oldSource: schema.foodEntries.nutrientSource,
       baseFood: {
-        energyKcal: schema.foods.energyKcal,
-        proteinG: schema.foods.proteinG,
-        carbsG: schema.foods.carbohydrateG,
-        fatG: schema.foods.totalFatG,
-        fiberG: schema.foods.dietaryFiberG,
-        sugarG: schema.foods.totalSugarsG,
-        sodiumMg: schema.foods.sodiumMg,
-        nutrientValues: schema.foods.nutrientValues,
+        energyKcal: schema.foods.energyKcal, proteinG: schema.foods.proteinG,
+        carbsG: schema.foods.carbohydrateG, fatG: schema.foods.totalFatG,
+        fiberG: schema.foods.dietaryFiberG, sodiumMg: schema.foods.sodiumMg,
+        sugarG: schema.foods.totalSugarsG, nutrientValues: schema.foods.nutrientValues,
         nutrientSource: schema.foods.nutrientSource,
       },
     }).from(schema.foodEntries)
+      .innerJoin(schema.diaryEntries, eq(schema.foodEntries.diaryEntryId, schema.diaryEntries.id))
       .leftJoin(schema.foods, eq(schema.foodEntries.foodId, schema.foods.id))
-      .where(eq(schema.foodEntries.id, foodEntryId)).get();
-    if (!row) return NextResponse.json({ error: 'Food entry not found' }, { status: 404 });
+      .where(and(eq(schema.foodEntries.id, foodEntryId), eq(schema.diaryEntries.userId, session.user.id))).get();
+    if (!row) return NextResponse.json({ error: 'Food entry not found.' }, { status: 404 });
 
-    const factor = row.oldQuantity > 0 ? quantity / row.oldQuantity : quantity;
-    const base = row.baseFood;
-    const fallback = (value: number | null) => value === null || value === undefined ? null : Math.round(value * factor * 10) / 10;
-    const nutrients = base ? {
-      energyKcal: scaleNullable(base.energyKcal, quantity),
-      proteinG: scaleNullable(base.proteinG, quantity),
-      carbsG: scaleNullable(base.carbsG, quantity),
-      fatG: scaleNullable(base.fatG, quantity),
-      fiberG: scaleNullable(base.fiberG, quantity),
-      sodiumMg: scaleNullable(base.sodiumMg, quantity),
-      sugarG: fallback(row.oldSugar),
-    } : {
-      energyKcal: fallback(row.oldEnergy), proteinG: fallback(row.oldProtein), carbsG: fallback(row.oldCarbs),
-      fatG: fallback(row.oldFat), fiberG: fallback(row.oldFiber), sodiumMg: fallback(row.oldSodium), sugarG: fallback(row.oldSugar),
+    const ratio = row.oldQuantity > 0 ? quantity / row.oldQuantity : quantity;
+    const linkedFood = row.baseFood && row.baseFood.nutrientSource !== undefined;
+    const base = linkedFood ? row.baseFood : {
+      energyKcal: row.oldEnergy === null ? null : row.oldEnergy / row.oldQuantity,
+      proteinG: row.oldProtein === null ? null : row.oldProtein / row.oldQuantity,
+      carbsG: row.oldCarbs === null ? null : row.oldCarbs / row.oldQuantity,
+      fatG: row.oldFat === null ? null : row.oldFat / row.oldQuantity,
+      fiberG: row.oldFiber === null ? null : row.oldFiber / row.oldQuantity,
+      sodiumMg: row.oldSodium === null ? null : row.oldSodium / row.oldQuantity,
+      sugarG: row.oldSugar === null ? null : row.oldSugar / row.oldQuantity,
     };
-    const baseValues = base?.nutrientValues || row.oldNutrients;
-    const nutrientValues = baseValues
-      ? Object.fromEntries(Object.entries(baseValues as Record<string, number>).map(([key, value]) => [
-          key, Math.round(value * (base?.nutrientValues ? quantity : factor) * 1000) / 1000,
-        ]))
-      : null;
+    const factor = linkedFood ? quantity : ratio;
+    const scaled = scaleNutrients({
+      energyKcal: base.energyKcal, proteinG: base.proteinG, carbsG: base.carbsG,
+      fatG: base.fatG, fiberG: base.fiberG, sodiumMg: base.sodiumMg, sugarG: base.sugarG,
+    }, factor);
+    const sourceMap = linkedFood ? row.baseFood.nutrientValues : row.oldNutrients;
+    const nutrientValues = sourceMap ? scaleNutrients(sourceMap as Record<string, number | null>, factor) : null;
+
     await db.update(schema.foodEntries).set({
-      quantity, ...nutrients, nutrientValues, nutrientSource: base?.nutrientSource || row.oldSource || null,
+      quantity, energyKcal: scaled.energyKcal, proteinG: scaled.proteinG,
+      carbsG: scaled.carbsG, fatG: scaled.fatG, fiberG: scaled.fiberG,
+      sodiumMg: scaled.sodiumMg, sugarG: scaled.sugarG, nutrientValues,
+      nutrientSource: (linkedFood ? row.baseFood.nutrientSource : null) || row.oldSource || null,
     }).where(eq(schema.foodEntries.id, foodEntryId)).run();
-    if (diaryEntryId) await recalcDiaryTotals(diaryEntryId);
+    await recalcDiaryTotals(row.diaryEntryId);
     return NextResponse.json({ success: true, quantity });
-  } catch (err) {
-    return NextResponse.json({ error: 'Server error: ' + (err instanceof Error ? err.message : 'Unknown') }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Could not update this food entry.' }, { status: 500 });
   }
 }
