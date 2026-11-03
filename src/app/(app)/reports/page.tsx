@@ -26,7 +26,7 @@ export default function ReportsPage() {
   }
 
   return <section className="space-y-4 pb-24">
-    <div><h1 className="text-2xl font-bold text-gray-900">Reports & Export</h1><p className="mt-1 text-sm text-gray-500">Download your own saved food records for backup or review.</p></div>
+    <div><h1 className="text-2xl font-bold text-gray-900">Reports & Export</h1><p className="mt-1 text-sm text-gray-500">Download your saved food and measurement records for backup or review.</p></div>
     <div className="space-y-3 rounded-xl bg-white p-4 shadow-sm">
       <label className="block text-sm font-medium text-gray-700">Export type
         <select value={kind} onChange={(event)=>setKind(event.target.value as 'food' | 'measurements')} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-3 text-base text-gray-900">
