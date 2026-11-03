@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'New password must be at least 8 characters' }, { status: 400 });
   }
 
-  const user = db.select().from(schema.users).where(eq(schema.users.id, session.user.id)).get();
+  const user = await db.select().from(schema.users).where(eq(schema.users.id, session.user.id)).get();
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
   const valid = await bcrypt.compare(currentPassword, user.passwordHash);
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   }
 
   const newHash = await bcrypt.hash(newPassword, 12);
-  db.update(schema.users).set({ passwordHash: newHash }).where(eq(schema.users.id, session.user.id)).run();
+  await db.update(schema.users).set({ passwordHash: newHash }).where(eq(schema.users.id, session.user.id)).run();
 
   return NextResponse.json({ success: true });
 }
