@@ -1,24 +1,31 @@
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import path from 'path';
-import fs from 'fs';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
-const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'health.db');
+async function main() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is required to run Tally migrations.');
+  }
 
-const dir = path.dirname(DB_PATH);
-if (!fs.existsSync(dir)) {
-  fs.mkdirSync(dir, { recursive: true });
+  const pool = new Pool({
+    connectionString,
+    max: 2,
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 10000,
+  });
+
+  try {
+    await pool.query('SELECT 1');
+    const database = drizzle(pool);
+    await migrate(database, { migrationsFolder: './drizzle-pg' });
+    console.log('Tally PostgreSQL migrations completed.');
+  } finally {
+    await pool.end();
+  }
 }
 
-const sqlite = new Database(DB_PATH);
-sqlite.pragma('journal_mode = WAL');
-sqlite.pragma('foreign_keys = ON');
-
-const db = drizzle(sqlite);
-
-console.log(`Migrating database at ${DB_PATH}...`);
-migrate(db, { migrationsFolder: path.join(process.cwd(), 'drizzle') });
-console.log('Migration complete.');
-
-sqlite.close();
+main().catch((error) => {
+  console.error('Tally PostgreSQL migration failed:', error);
+  process.exitCode = 1;
+});
