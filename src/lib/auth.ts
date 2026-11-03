@@ -101,7 +101,7 @@ export async function getSession(): Promise<{ token: string; user: AuthUser } | 
   const payload = verifyToken(refreshToken, 'refresh');
   if (!payload) return null;
 
-  const user = getUserById(payload.userId);
+  const user = await getUserById(payload.userId);
   if (!user) return null;
 
   await setTokenCookies(payload.userId);
