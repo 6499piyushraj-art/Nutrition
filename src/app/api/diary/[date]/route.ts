@@ -11,7 +11,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dat
 
   try {
     // Fetch diary entries for the given date, user, and type
-    const entries = db
+    const entries = await db
       .select()
       .from(schema.diaryEntries)
       .where(
@@ -24,8 +24,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dat
       .all();
 
     // For each entry, fetch food entries with linked food data
-    const result = entries.map((entry) => {
-      const foodEntriesData = db
+    const result = await Promise.all(entries.map(async (entry) => {
+      const foodEntriesData = await db
         .select({
           id: schema.foodEntries.id,
           quantity: schema.foodEntries.quantity,
@@ -85,7 +85,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ dat
             : null,
         })),
       };
-    });
+    }));
 
     const response = NextResponse.json({ entries: result });
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
