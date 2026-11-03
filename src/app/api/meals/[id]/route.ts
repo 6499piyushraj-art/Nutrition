@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const { id } = await params;
 
     // Fetch the meal
-    const meal = await db
+    const meal: Array<typeof schema.meals.$inferSelect> = await db
       .select()
       .from(schema.meals)
       .where(eq(schema.meals.id, id))
@@ -44,7 +44,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       .where(eq(schema.mealItems.mealId, id));
 
     // Fetch meal tags
-    const tagRecords = await db
+    const tagRecords: Array<{ id: string; foodTagId: string; tagName: string; tagColor: string | null }> = await db
       .select({
         id: schema.mealsToFoodTags.id,
         foodTagId: schema.mealsToFoodTags.foodTagId,
