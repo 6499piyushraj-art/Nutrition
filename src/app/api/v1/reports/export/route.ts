@@ -37,7 +37,8 @@ export async function GET(request: Request) {
   const format = params.get('format') || 'csv';
   const kind = params.get('kind') || 'food';
   if (format !== 'csv' && format !== 'json') return NextResponse.json({ error: 'format must be csv or json.' }, { status: 400 });
-  if (kind !== 'food' && kind !== 'measurements') return NextResponse.json({ error: 'kind must be food or measurements.' }, { status: 400 });
+  if (kind !== 'food' && kind !== 'measurements' && kind !== 'all') return NextResponse.json({ error: 'kind must be food, measurements or all.' }, { status: 400 });
+  if (kind === 'all' && format !== 'json') return NextResponse.json({ error: 'Full account backup is available as JSON.' }, { status: 400 });
 
   const now = new Date();
   const today = [now.getFullYear(), String(now.getMonth()+1).padStart(2,'0'), String(now.getDate()).padStart(2,'0')].join('-');
@@ -48,6 +49,85 @@ export async function GET(request: Request) {
   if (span > 365) return NextResponse.json({ error: 'Export range cannot exceed 366 days.' }, { status: 400 });
 
   try {
+    if (kind === 'all') {
+      const [
+        account, profile, targets, foods, foodTags, foodTagLinks, foodServings,
+        diaryEntries, foodEntries, exercises, measurements, meals, mealItems,
+        mealTags, journalEntries,
+      ] = await Promise.all([
+        db.select({
+          id: schema.users.id,
+          email: schema.users.email,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
+          role: schema.users.role,
+          createdAt: schema.users.createdAt,
+        }).from(schema.users).where(eq(schema.users.id, session.user.id)).get(),
+        db.select().from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get(),
+        db.select().from(schema.nutrientTargets).where(eq(schema.nutrientTargets.userId, session.user.id)).get(),
+        db.select().from(schema.foods).where(eq(schema.foods.userId, session.user.id)),
+        db.select().from(schema.foodTags).where(eq(schema.foodTags.userId, session.user.id)),
+        db.select({ link: schema.foodsToFoodTags }).from(schema.foodsToFoodTags)
+          .innerJoin(schema.foods, eq(schema.foodsToFoodTags.foodId, schema.foods.id))
+          .where(eq(schema.foods.userId, session.user.id)),
+        db.select({ serving: schema.foodServings }).from(schema.foodServings)
+          .innerJoin(schema.foods, eq(schema.foodServings.foodId, schema.foods.id))
+          .where(eq(schema.foods.userId, session.user.id)),
+        db.select().from(schema.diaryEntries).where(and(
+          eq(schema.diaryEntries.userId, session.user.id),
+          gte(schema.diaryEntries.date, from),
+          lte(schema.diaryEntries.date, to),
+        )),
+        db.select({ foodEntry: schema.foodEntries, diaryDate: schema.diaryEntries.date })
+          .from(schema.foodEntries).innerJoin(schema.diaryEntries, eq(schema.foodEntries.diaryEntryId, schema.diaryEntries.id))
+          .where(and(
+            eq(schema.diaryEntries.userId, session.user.id),
+            gte(schema.diaryEntries.date, from),
+            lte(schema.diaryEntries.date, to),
+          )),
+        db.select({ exercise: schema.exercises, diaryDate: schema.diaryEntries.date })
+          .from(schema.exercises).innerJoin(schema.diaryEntries, eq(schema.exercises.diaryEntryId, schema.diaryEntries.id))
+          .where(and(
+            eq(schema.diaryEntries.userId, session.user.id),
+            gte(schema.diaryEntries.date, from),
+            lte(schema.diaryEntries.date, to),
+          )),
+        db.select().from(schema.measurements).where(and(
+          eq(schema.measurements.userId, session.user.id),
+          gte(schema.measurements.date, from),
+          lte(schema.measurements.date, to),
+        )),
+        db.select().from(schema.meals).where(eq(schema.meals.userId, session.user.id)),
+        db.select({ item: schema.mealItems, mealName: schema.meals.name })
+          .from(schema.mealItems).innerJoin(schema.meals, eq(schema.mealItems.mealId, schema.meals.id))
+          .where(eq(schema.meals.userId, session.user.id)),
+        db.select({ link: schema.mealsToFoodTags }).from(schema.mealsToFoodTags)
+          .innerJoin(schema.meals, eq(schema.mealsToFoodTags.mealId, schema.meals.id))
+          .where(eq(schema.meals.userId, session.user.id)),
+        db.select().from(schema.journalEntries).where(and(
+          eq(schema.journalEntries.userId, session.user.id),
+          gte(schema.journalEntries.entryDate, from),
+          lte(schema.journalEntries.entryDate, to),
+        )),
+      ]);
+
+      return new NextResponse(JSON.stringify({
+        exportType: 'MyNutri full account backup',
+        exportedAt: new Date().toISOString(),
+        dateRange: { from, to },
+        note: 'Password hashes and authentication tokens are excluded. Dated diary, journal, measurement and exercise records are limited to the selected date range.',
+        account, profile, nutrientTargets: targets, foods, foodTags, foodTagLinks,
+        foodServings, diaryEntries, foodEntries, exercises, measurements, meals,
+        mealItems, mealTags, journalEntries,
+      }, null, 2), {
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Content-Disposition': `attachment; filename="mynutri-full-backup-${from}-${to}.json"`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
+
     if (kind === 'measurements') {
       const rows: MeasurementExportRow[] = await db.select({
         date: schema.measurements.date,
