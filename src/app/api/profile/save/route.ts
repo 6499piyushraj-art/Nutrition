@@ -23,7 +23,7 @@ function toSnake(data: Record<string, unknown>) {
   return Object.fromEntries(Object.entries(data).map(([key, value]) => [reverse[key] || key, value]));
 }
 function ageFromDob(value: unknown): number | null {
-  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return null;
+  if (typeof value !== 'string' || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return null;
   const dob = new Date(value + 'T00:00:00');
   if (Number.isNaN(dob.getTime())) return null;
   const now = new Date();
