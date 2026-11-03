@@ -44,7 +44,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const food = foods[0];
 
     // Fetch tags for this food
-    const tags = await db
+    const tags: Array<{ id: string; name: string; color: string | null }> = await db
       .select({
         id: schema.foodTags.id,
         name: schema.foodTags.name,
