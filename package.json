@@ -1,11 +1,11 @@
 {
-  "name": "health-app-scaffold",
+  "name": "mynutri",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "tsx src/lib/db/migrate.ts && next start",
+    "start": "tsx src/lib/db/migrate.ts && node .next/standalone/server.js",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "tsx src/lib/db/migrate.ts",
