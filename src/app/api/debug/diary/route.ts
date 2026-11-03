@@ -10,15 +10,15 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get('date') || '2026-04-13';
 
-  const entries = db.select().from(schema.diaryEntries)
+  const entries = await db.select().from(schema.diaryEntries)
     .where(and(
       eq(schema.diaryEntries.date, date),
       eq(schema.diaryEntries.userId, session.user.id),
       eq(schema.diaryEntries.type, 'diary_meal'),
     )).all();
 
-  const entriesWithFoods = entries.map((entry) => {
-    const foodEntriesData = db.select({
+  const entriesWithFoods = await Promise.all(entries.map(async (entry) => {
+    const foodEntriesData = await db.select({
       id: schema.foodEntries.id,
       quantity: schema.foodEntries.quantity,
       energy_kcal: schema.foodEntries.energyKcal,
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
         food: fe.food_id ? { id: fe.food_id, description: fe.food_description } : null,
       })),
     };
-  });
+  }));
 
   return NextResponse.json({
     userId: session.user.id,
