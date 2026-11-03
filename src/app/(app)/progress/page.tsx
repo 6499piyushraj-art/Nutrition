@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { db, schema } from '@/lib/db';
 import { and, asc, eq } from 'drizzle-orm';
 import { isUnder18OrUnknown } from '@/lib/nutrition-calculator';
+import HeightLogForm from '@/components/progress/HeightLogForm';
 
 
 export const dynamic = 'force-dynamic';
@@ -33,6 +34,7 @@ export default async function ProgressPage() {
         <h1 className="text-2xl font-bold text-gray-900">Growth & Measurements</h1>
         <p className="mt-1 text-sm text-gray-500">Optional, private records. This app does not predict adult height or diagnose health conditions.</p>
       </div>
+      <HeightLogForm />
       {restricted && <div className="rounded-xl bg-brand-50 p-4 text-sm text-brand-800">
         Weight-goal tools are disabled for younger users and for accounts without a saved birth date. Growth varies from person to person; discuss concerns with a qualified health professional.
       </div>}
