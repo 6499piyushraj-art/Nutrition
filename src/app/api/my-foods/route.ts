@@ -81,7 +81,7 @@ export async function GET(request: Request) {
         const tagId = tag[0].id;
 
         // Get food IDs that have this tag
-        const foodsWithTag = await db
+        const foodsWithTag: Array<{ foodId: string }> = await db
           .select({ foodId: schema.foodsToFoodTags.foodId })
           .from(schema.foodsToFoodTags)
           .where(eq(schema.foodsToFoodTags.foodTagId, tagId));
