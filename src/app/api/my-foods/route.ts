@@ -3,6 +3,17 @@ import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { eq, and, like, isNull } from 'drizzle-orm';
 
+type FoodListRow = {
+  id: string; description: string; brandName: string | null; brandOwner: string | null;
+  upcCode: string | null; fdcId: number | null; source: string | null;
+  defaultServingSize: number | null; defaultServingUnit: string | null;
+  energyKcal: number | null; proteinG: number | null; totalFatG: number | null;
+  carbohydrateG: number | null; dietaryFiberG: number | null; totalSugarsG: number | null;
+  sodiumMg: number | null; saturatedFatG: number | null; cholesterolMg: number | null;
+  nutrientValues: Record<string, number> | null; nutrientSource: string | null;
+};
+type FoodTagRow = { id: string; name: string; color: string | null };
+
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -22,7 +33,7 @@ export async function GET(request: Request) {
       conditions.push(like(schema.foods.description, `%${query}%`));
     }
 
-    let foods = await db
+    let foods: FoodListRow[] = await db
       .select({
         id: schema.foods.id,
         description: schema.foods.description,
@@ -87,7 +98,7 @@ export async function GET(request: Request) {
     // Fetch tags for each food
     const foodsWithTags = await Promise.all(
       foods.map(async (food) => {
-        const tags = await db
+        const tags: FoodTagRow[] = await db
           .select({
             id: schema.foodTags.id,
             name: schema.foodTags.name,
