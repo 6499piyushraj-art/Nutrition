@@ -2,16 +2,8 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { eq } from 'drizzle-orm';
-import { validIsoDate } from '@/lib/nutrition-calculator';
+import { isVerifiedAdult, validIsoDate } from '@/lib/nutrition-calculator';
 
-function adultVerified(dateOfBirth?: string | null): boolean {
-  if (!dateOfBirth || !validIsoDate(dateOfBirth)) return false;
-  const birth = new Date(dateOfBirth + 'T00:00:00');
-  const now = new Date();
-  let age = now.getFullYear() - birth.getFullYear();
-  if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
-  return age >= 18 && age < 120;
-}
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -22,7 +14,7 @@ export async function POST(request: Request) {
       id: schema.healthProfiles.id,
       dateOfBirth: schema.healthProfiles.dateOfBirth,
     }).from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();
-    if (!adultVerified(profile?.dateOfBirth)) {
+    if (!isVerifiedAdult(profile?.dateOfBirth)) {
       return NextResponse.json({ error: 'Weight tracking is not enabled for accounts without a verified adult age.' }, { status: 403 });
     }
 
