@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { and, eq } from 'drizzle-orm';
 import { getDefaultNutrientTargets, NUTRIENT_SPECS } from '@/lib/nutrients';
+import { ageFromDateOfBirth } from '@/lib/nutrition-calculator';
 
 const fields: Record<string, string> = {
   date_of_birth: 'dateOfBirth', height_ft: 'heightFt', height_in: 'heightIn',
@@ -23,13 +24,7 @@ function toSnake(data: Record<string, unknown>) {
   return Object.fromEntries(Object.entries(data).map(([key, value]) => [reverse[key] || key, value]));
 }
 function ageFromDob(value: unknown): number | null {
-  if (typeof value !== 'string' || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return null;
-  const dob = new Date(value + 'T00:00:00');
-  if (Number.isNaN(dob.getTime()) || dob.toISOString().slice(0, 10) !== value) return null;
-  const now = new Date();
-  let age = now.getFullYear() - dob.getFullYear();
-  if (now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) age--;
-  return age >= 0 && age < 120 ? age : null;
+  return typeof value === 'string' ? ageFromDateOfBirth(value) : null;
 }
 
 export async function POST(request: Request) {
