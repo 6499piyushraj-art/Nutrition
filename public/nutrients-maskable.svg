@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="512" height="512" role="img" aria-label="Nutrients leaf and bowl logo">
+  <defs>
+    <linearGradient id="cream" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFF8E9"/><stop offset="1" stop-color="#F8E5BE"/></linearGradient>
+    <linearGradient id="citrus" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC45D"/><stop offset="1" stop-color="#F28B36"/></linearGradient>
+    <linearGradient id="sage" x1="0" y1="0" x2="0.9" y2="1"><stop offset="0" stop-color="#78A96F"/><stop offset="1" stop-color="#356B4A"/></linearGradient>
+  </defs>
+  <rect x="0" y="0" width="128" height="128" fill="#FFF4DF"/>
+  <rect x="4" y="4" width="120" height="120" rx="34" fill="url(#cream)" stroke="#E9CC91" stroke-width="2"/>
+  <circle cx="91" cy="36" r="19" fill="url(#citrus)"/>
+  <path d="M27 67 C31 92 48 109 64 109 C80 109 97 92 101 67 Z" fill="url(#sage)"/>
+  <path d="M27 67 C40 56 88 56 101 67 C91 78 37 78 27 67 Z" fill="#FFF2D2" stroke="#356B4A" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M38 64 C46 58 55 58 64 64 C72 58 82 58 91 64" fill="none" stroke="#E8A64C" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M47 61 C38 51 38 40 48 32 C58 41 59 51 47 61 Z" fill="#4F8A55"/>
+  <path d="M49 60 C55 45 66 36 79 36 C78 50 67 60 49 60 Z" fill="#79A85F"/>
+  <path d="M49 58 C56 49 64 42 74 39" fill="none" stroke="#DCE9BD" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M46 65 C55 55 73 52 86 59 C78 70 59 73 46 65 Z" fill="#F4A34B"/>
+  <path d="M52 64 C61 61 72 60 80 61" fill="none" stroke="#FFE4A8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M37 84 C48 94 80 97 92 84" fill="none" stroke="#DDE8C8" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="91" cy="36" r="5" fill="#FFE8B2" opacity=".85"/>
+  <path d="M64 20 C67 11 76 8 84 12 C82 21 75 26 64 20 Z" fill="#5C965A"/>
+  <path d="M70 20 C74 16 78 14 82 13" fill="none" stroke="#E7F0D5" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

@@ -1,10 +1,10 @@
-# Tally
+# Nutrients
 
-**Your food, your goals, your data.**
+**Eat well. Feel balanced.**
 
 A mobile-first Progressive Web App for food logging, nutrition tracking, and health goals. Self-hosted with its own SQLite database and authentication — no external backend dependencies, no subscription fees, and your data stays on your server.
 
-## Why Tally?
+## Why Nutrients?
 
 - **Free** — no subscription, no ads, no premium tiers
 - **Private** — your data lives on your own server, not in someone else's cloud
@@ -82,7 +82,7 @@ Dev server runs at `http://localhost:3000`.
 
 ## AI Providers
 
-AI food parsing is optional — the app works fine without it. If configured, Tally uses the cheapest available provider:
+AI food parsing is optional — the app works fine without it. If configured, Nutrients uses the cheapest available provider:
 
 | Task | Provider | Model | Cost |
 |---|---|---|---|
