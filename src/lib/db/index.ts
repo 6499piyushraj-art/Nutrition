@@ -41,8 +41,13 @@ export function getDatabase(): Database {
  * They remain asynchronous: callers must await .get(), .all(), and .run().
  */
 function wrapQuery<T extends object>(query: T): any {
+  if (Array.isArray(query)) return query;
   return new Proxy(query, {
     get(target, property) {
+      if (property === 'then') {
+        const then = Reflect.get(target, property, target);
+        return typeof then === 'function' ? then.bind(target) : then;
+      }
       if (property === 'get') {
         return async () => {
           const limited = typeof (target as QueryLike).limit === 'function'
