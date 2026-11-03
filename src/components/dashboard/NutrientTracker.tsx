@@ -5,7 +5,7 @@ import { ChevronDown, ChevronUp, RefreshCw, Save, SlidersHorizontal } from 'luci
 import { NUTRIENT_SPECS, getDefaultNutrientTargets, type NutrientConfidence, type NutrientStatus, type NutrientTargets } from '@/lib/nutrients';
 
 interface NutrientSummary { value: number | null; status: NutrientStatus; confidence: NutrientConfidence; knownFoods: number; totalFoods: number; }
-interface ApiData { date: string; targets: NutrientTargets; nutrition: Record<string, NutrientSummary>; foodsLogged: number; }
+interface ApiData { date: string; targets: NutrientTargets; nutrition: Record<string, NutrientSummary>; foodsLogged: number; isMinor?: boolean; }
 type Key = keyof NutrientTargets;
 
 function fmt(value: number, unit: string) {
@@ -62,7 +62,7 @@ export default function NutrientTracker() {
 
   const macroEnergy = useMemo(() => draft.protein * 4 + draft.carbs * 4 + draft.fat * 9, [draft]);
   const calorieGap = draft.calories - macroEnergy;
-  const macroWarning = Math.abs(calorieGap) >= 50;
+  const macroWarning = !data?.isMinor && Number.isFinite(calorieGap) && Math.abs(calorieGap) >= 50;
 
   function card(key: Key) {
     const spec = NUTRIENT_SPECS.find((item) => item.key === key)!;
@@ -82,7 +82,7 @@ export default function NutrientTracker() {
     );
   }
 
-  const macroSpecs = NUTRIENT_SPECS.filter((item) => item.group === 'macro');
+  const macroSpecs = NUTRIENT_SPECS.filter((item) => item.group === 'macro' && !(data?.isMinor && item.key === 'calories'));
   const essentialSpecs = NUTRIENT_SPECS.filter((item) => item.group === 'essential');
 
   return (
@@ -122,7 +122,7 @@ export default function NutrientTracker() {
                 <div key={group}>
                   <h4 className="mb-2 text-sm font-semibold text-gray-700">{group === 'macro' ? 'Energy & macros' : 'Essential micronutrients'}</h4>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {NUTRIENT_SPECS.filter((spec) => spec.group === group).map((spec) => (
+                    {NUTRIENT_SPECS.filter((spec) => spec.group === group && !(data?.isMinor && spec.key === 'calories')).map((spec) => (
                       <label key={spec.key} className="block text-sm text-gray-700">
                         <span className="flex items-baseline justify-between gap-2"><span className="font-medium">{spec.label}{('isLimit' in spec && spec.isLimit) ? ' limit' : ''}</span><span className="text-xs text-gray-500">{spec.unit}</span></span>
                         <input type="number" min="0" step="any" required value={draft[spec.key as Key]}
