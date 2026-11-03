@@ -137,10 +137,10 @@ export default function MyFoodsPage() {
                 <p className="text-sm text-gray-500 mt-0.5">{food.brand_name}</p>
               )}
               <div className="flex gap-4 mt-2 text-sm">
-                <span className="text-orange-600 font-medium">{food.energy_kcal || 0} cal</span>
-                <span className="text-gray-600">P {food.protein_g || 0}g</span>
-                <span className="text-gray-600">C {food.carbs_g || 0}g</span>
-                <span className="text-gray-600">F {food.fat_g || 0}g</span>
+                <span className="text-orange-600 font-medium">{food.energy_kcal == null ? '—' : food.energy_kcal + ' cal'}</span>
+                <span className="text-gray-600">P {food.protein_g == null ? '—' : food.protein_g + 'g'}</span>
+                <span className="text-gray-600">C {food.carbs_g == null ? '—' : food.carbs_g + 'g'}</span>
+                <span className="text-gray-600">F {food.fat_g == null ? '—' : food.fat_g + 'g'}</span>
               </div>
               {food.tags && food.tags.length > 0 && (
                 <div className="flex gap-1 mt-2 flex-wrap">
