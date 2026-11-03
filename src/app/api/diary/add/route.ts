@@ -35,12 +35,12 @@ export async function POST(request: Request) {
     let foodId: string | null = typeof food.food_id === 'string' ? food.food_id : null;
     if (!foodId && typeof food.description === 'string' && food.description.trim()) {
       const description = food.description.trim();
-      const oldFood = db.select({ id: schema.foods.id }).from(schema.foods)
+      const oldFood = await db.select({ id: schema.foods.id }).from(schema.foods)
         .where(and(eq(schema.foods.userId, session.user.id), eq(schema.foods.description, description))).get();
       if (oldFood) {
         foodId = oldFood.id;
       } else {
-        const created = db.insert(schema.foods).values({
+        const created = await db.insert(schema.foods).values({
           userId: session.user.id,
           description,
           source: food.source || 'manual',
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       }
     }
 
-    let diary = db.select().from(schema.diaryEntries).where(and(
+    let diary = await db.select().from(schema.diaryEntries).where(and(
       eq(schema.diaryEntries.date, date),
       eq(schema.diaryEntries.diaryMeal, meal),
       eq(schema.diaryEntries.type, 'diary_meal'),
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     let diaryEntryId: string;
     if (diary) diaryEntryId = diary.id;
     else {
-      const createdDiary = db.insert(schema.diaryEntries).values({
+      const createdDiary = await db.insert(schema.diaryEntries).values({
         date, type: 'diary_meal', diaryMeal: meal, userId: session.user.id,
         totalCalories: 0, totalProteinG: 0, totalCarbsG: 0, totalFatG: 0,
         totalFiberG: 0, totalSodiumMg: 0, totalSugarG: 0,
@@ -85,13 +85,13 @@ export async function POST(request: Request) {
     const nutrientsForEntry = baseNutrients
       ? Object.fromEntries(Object.entries(baseNutrients).map(([key, value]) => [key, Math.round(value * quantity * 1000) / 1000]))
       : null;
-    db.insert(schema.foodEntries).values({
+    await db.insert(schema.foodEntries).values({
       diaryEntryId, foodId, quantity,
       energyKcal: scale(food.calories), proteinG: scale(food.protein_g), carbsG: scale(food.carbs_g),
       fatG: scale(food.fat_g), fiberG: scale(food.fiber_g), sodiumMg: scale(food.sodium_mg),
       sugarG: scale(food.sugar_g), nutrientValues: nutrientsForEntry, nutrientSource: source,
     }).run();
-    recalcDiaryTotals(diaryEntryId);
+    await recalcDiaryTotals(diaryEntryId);
     return NextResponse.json({ success: true, diary_entry: diaryEntryId });
   } catch (err) {
     return NextResponse.json({ error: 'Server error: ' + (err instanceof Error ? err.message : 'Unknown') }, { status: 500 });
