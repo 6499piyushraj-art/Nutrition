@@ -18,7 +18,11 @@ async function main() {
   try {
     await pool.query('SELECT 1');
     const database = drizzle(pool);
-    await migrate(database, { migrationsFolder: './drizzle-pg' });
+    await migrate(database, {
+      migrationsFolder: './drizzle-pg',
+      migrationsSchema: 'tally',
+      migrationsTable: '__drizzle_migrations',
+    });
     console.log('Tally PostgreSQL migrations completed.');
   } finally {
     await pool.end();
