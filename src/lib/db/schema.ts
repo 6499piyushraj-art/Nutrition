@@ -1,21 +1,23 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { pgSchema, text, integer, real, jsonb } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+
+const tallySchema = pgSchema('tally');
 
 // ── Users ──────────────────────────────────────────────────────────
 
-export const users = sqliteTable('users', {
+export const users = tallySchema.table('users', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   firstName: text('first_name'),
   lastName: text('last_name'),
   role: text('role').notNull().default('athlete'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`now()::text`),
 });
 
 // ── Health Profile ─────────────────────────────────────────────────
 
-export const healthProfiles = sqliteTable('health_profiles', {
+export const healthProfiles = tallySchema.table('health_profiles', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
   dateOfBirth: text('date_of_birth'),
@@ -38,21 +40,21 @@ export const healthProfiles = sqliteTable('health_profiles', {
   goalSodiumMg: integer('goal_sodium_mg'),
   goalSugarG: integer('goal_sugar_g'),
   unitSystem: text('unit_system').default('imperial'),
-  mealNames: text('meal_names', { mode: 'json' }).$type<string[]>(),
+  mealNames: jsonb('meal_names').$type<string[]>(),
   notes: text('notes'),
 });
 
-export const nutrientTargets = sqliteTable('nutrient_targets', {
+export const nutrientTargets = tallySchema.table('nutrient_targets', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
-  targets: text('targets', { mode: 'json' }).$type<Record<string, number>>().notNull(),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  targets: jsonb('targets').$type<Record<string, number>>().notNull(),
+  createdAt: text('created_at').notNull().default(sql`now()::text`),
+  updatedAt: text('updated_at').notNull().default(sql`now()::text`),
 });
 
 // ── Foods ──────────────────────────────────────────────────────────
 
-export const foods = sqliteTable('foods', {
+export const foods = tallySchema.table('foods', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   fdcId: integer('fdc_id'),
@@ -82,15 +84,15 @@ export const foods = sqliteTable('foods', {
   calciumMg: real('calcium_mg'),
   ironMg: real('iron_mg'),
   vitaminDMcg: real('vitamin_d_mcg'),
-  nutrientValues: text('nutrient_values', { mode: 'json' }).$type<Record<string, number>>(),
+  nutrientValues: jsonb('nutrient_values').$type<Record<string, number>>(),
   nutrientSource: text('nutrient_source'),
   deletedAt: text('deleted_at'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`now()::text`),
 });
 
 // ── Food Tags ──────────────────────────────────────────────────────
 
-export const foodTags = sqliteTable('food_tags', {
+export const foodTags = tallySchema.table('food_tags', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
@@ -99,7 +101,7 @@ export const foodTags = sqliteTable('food_tags', {
   deletedAt: text('deleted_at'),
 });
 
-export const foodsToFoodTags = sqliteTable('foods_food_tags', {
+export const foodsToFoodTags = tallySchema.table('foods_food_tags', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   foodId: text('food_id').notNull().references(() => foods.id, { onDelete: 'cascade' }),
   foodTagId: text('food_tag_id').notNull().references(() => foodTags.id, { onDelete: 'cascade' }),
@@ -107,7 +109,7 @@ export const foodsToFoodTags = sqliteTable('foods_food_tags', {
 
 // ── Food Servings ──────────────────────────────────────────────────
 
-export const foodServings = sqliteTable('food_servings', {
+export const foodServings = tallySchema.table('food_servings', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   foodId: text('food_id').notNull().references(() => foods.id, { onDelete: 'cascade' }),
   label: text('label').notNull(),
@@ -118,7 +120,7 @@ export const foodServings = sqliteTable('food_servings', {
 
 // ── Diary Entries ──────────────────────────────────────────────────
 
-export const diaryEntries = sqliteTable('diary_entries', {
+export const diaryEntries = tallySchema.table('diary_entries', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   date: text('date').notNull(),
@@ -134,12 +136,12 @@ export const diaryEntries = sqliteTable('diary_entries', {
   totalFiberG: real('total_fiber_g').default(0),
   totalSodiumMg: real('total_sodium_mg').default(0),
   totalSugarG: real('total_sugar_g').default(0),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`now()::text`),
 });
 
 // ── Food Entries (child of diary entry) ────────────────────────────
 
-export const foodEntries = sqliteTable('food_entries', {
+export const foodEntries = tallySchema.table('food_entries', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   diaryEntryId: text('diary_entry_id').notNull().references(() => diaryEntries.id, { onDelete: 'cascade' }),
   foodId: text('food_id').references(() => foods.id, { onDelete: 'set null' }),
@@ -152,13 +154,13 @@ export const foodEntries = sqliteTable('food_entries', {
   fiberG: real('fiber_g'),
   sodiumMg: real('sodium_mg'),
   sugarG: real('sugar_g'),
-  nutrientValues: text('nutrient_values', { mode: 'json' }).$type<Record<string, number>>(),
+  nutrientValues: jsonb('nutrient_values').$type<Record<string, number>>(),
   nutrientSource: text('nutrient_source'),
 });
 
 // ── Exercises (child of diary entry) ───────────────────────────────
 
-export const exercises = sqliteTable('exercises', {
+export const exercises = tallySchema.table('exercises', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   diaryEntryId: text('diary_entry_id').notNull().references(() => diaryEntries.id, { onDelete: 'cascade' }),
   exerciseType: text('exercise_type'),
@@ -176,7 +178,7 @@ export const exercises = sqliteTable('exercises', {
 
 // ── Measurements ───────────────────────────────────────────────────
 
-export const measurements = sqliteTable('measurements', {
+export const measurements = tallySchema.table('measurements', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   date: text('date').notNull(),
@@ -185,22 +187,22 @@ export const measurements = sqliteTable('measurements', {
   unit: text('unit'),
   notes: text('notes'),
   photo: text('photo'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`now()::text`),
 });
 
 // ── Meals (templates) ──────────────────────────────────────────────
 
-export const meals = sqliteTable('meals', {
+export const meals = tallySchema.table('meals', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   description: text('description'),
   defaultMealType: text('default_meal_type'),
   deletedAt: text('deleted_at'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`now()::text`),
 });
 
-export const mealItems = sqliteTable('meal_items', {
+export const mealItems = tallySchema.table('meal_items', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   mealId: text('meal_id').notNull().references(() => meals.id, { onDelete: 'cascade' }),
   foodId: text('food_id').notNull().references(() => foods.id, { onDelete: 'cascade' }),
@@ -208,7 +210,7 @@ export const mealItems = sqliteTable('meal_items', {
   quantity: real('quantity').notNull().default(1),
 });
 
-export const mealsToFoodTags = sqliteTable('meals_food_tags', {
+export const mealsToFoodTags = tallySchema.table('meals_food_tags', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   mealId: text('meal_id').notNull().references(() => meals.id, { onDelete: 'cascade' }),
   foodTagId: text('food_tag_id').notNull().references(() => foodTags.id, { onDelete: 'cascade' }),
@@ -216,12 +218,12 @@ export const mealsToFoodTags = sqliteTable('meals_food_tags', {
 
 // ── Journal Entries ────────────────────────────────────────────────
 
-export const journalEntries = sqliteTable('journal_entries', {
+export const journalEntries = tallySchema.table('journal_entries', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   entryDate: text('entry_date').notNull(),
   entryTime: text('entry_time').notNull(),
   content: text('content').notNull(),
   deletedAt: text('deleted_at'),
-  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  createdAt: text('created_at').notNull().default(sql`now()::text`),
 });
