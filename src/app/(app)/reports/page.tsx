@@ -33,8 +33,8 @@ export default function ReportsPage() {
           <option value="food">Food history</option><option value="measurements">Height and weight measurements</option><option value="all">Full account backup (JSON)</option>
         </select>
       </label>
-      <label className="block text-sm font-medium text-gray-700">From<input type="date" value={from} max={today()} onChange={(e)=>setFrom(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-3"/></label>
-      <label className="block text-sm font-medium text-gray-700">To<input type="date" value={to} max={today()} onChange={(e)=>setTo(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-3"/></label>
+      <label className="block text-sm font-medium text-gray-700">From<input type="date" value={from} max={today()} disabled={kind === 'all'} onChange={(e)=>setFrom(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-3"/></label>
+      <label className="block text-sm font-medium text-gray-700">To<input type="date" value={to} max={today()} disabled={kind === 'all'} onChange={(e)=>setTo(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-3"/></label>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       <div className="grid grid-cols-2 gap-3">
         <button onClick={()=>exportFile('csv')} className="min-h-[48px] rounded-lg bg-brand-600 px-4 py-3 font-semibold text-white">Export CSV</button>
@@ -42,6 +42,6 @@ export default function ReportsPage() {
       </div>
       <button onClick={()=>window.print()} className="min-h-[44px] w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700">Print this page / Save as PDF</button>
     </div>
-    <p className="text-xs text-gray-500">Exports contain only records from your account. Food, measurement and full-backup exports use the selected date range for dated records. Unknown food nutrients remain blank. Full backups exclude passwords and authentication tokens.</p>
+    <p className="text-xs text-gray-500">Food and measurement exports use the selected date range. Full account backup includes all dates and all user-owned app records, but excludes passwords and authentication tokens. Unknown food nutrients remain blank.</p>
   </section>;
 }
