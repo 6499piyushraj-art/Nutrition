@@ -5,7 +5,7 @@ import { ChevronDown, ChevronUp, RefreshCw, Save, SlidersHorizontal } from 'luci
 import { NUTRIENT_SPECS, getDefaultNutrientTargets, type NutrientConfidence, type NutrientStatus, type NutrientTargets } from '@/lib/nutrients';
 
 interface NutrientSummary { value: number | null; status: NutrientStatus; confidence: NutrientConfidence; knownFoods: number; totalFoods: number; }
-interface ApiData { date: string; targets: NutrientTargets; nutrition: Record<string, NutrientSummary>; foodsLogged: number; isMinor?: boolean; }
+interface ApiData { date: string; targets: NutrientTargets; nutrition: Record<string, NutrientSummary>; foodsLogged: number; isMinor?: boolean; targetNotes?: { referenceSource?: { name: string; year: number; sourceUrl: string; populationGroup: string } }; }
 type Key = keyof NutrientTargets;
 
 function fmt(value: number, unit: string) {
@@ -90,7 +90,8 @@ export default function NutrientTracker() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Daily Nutrient Dashboard</h2>
-          <p className="mt-1 text-xs text-gray-500">Targets are configurable reference values, not personalized medical prescriptions.</p>
+          <p className="mt-1 text-xs text-gray-500">Targets are population reference values, not personalized medical prescriptions.</p>
+          {data?.targetNotes?.referenceSource && <p className="mt-1 text-[11px] text-gray-500">Reference basis: {data.targetNotes.referenceSource.populationGroup} · {data.targetNotes.referenceSource.name} ({data.targetNotes.referenceSource.year}). <a href={data.targetNotes.referenceSource.sourceUrl} target="_blank" rel="noreferrer" className="font-medium text-brand-700 underline">View source</a></p>}
         </div>
         <button onClick={() => void load()} aria-label="Refresh nutrient summary" className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-gray-200 p-2 text-gray-600"><RefreshCw size={17} /></button>
       </div>
