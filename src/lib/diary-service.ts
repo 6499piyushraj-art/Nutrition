@@ -1,4 +1,5 @@
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
+type DiaryRow = typeof schema.diaryEntries.$inferSelect;
 import { db, schema } from '@/lib/db';
 import { NUTRIENT_SPECS } from '@/lib/nutrients';
 import { aggregateKnownValues } from '@/lib/nutrition-calculator';
@@ -23,10 +24,10 @@ function valueFor(row: FoodRow, key: string): number | null {
 }
 
 export async function getDiaryDay(userId: string, date: string) {
-  const entries = await db.select().from(schema.diaryEntries).where(and(
+  const entries: DiaryRow[] = await db.select().from(schema.diaryEntries).where(and(
     eq(schema.diaryEntries.userId, userId), eq(schema.diaryEntries.date, date),
     eq(schema.diaryEntries.type, 'diary_meal'),
-  )).orderBy(asc(schema.diaryEntries.createdAt)).all();
+  )).orderBy(asc(schema.diaryEntries.createdAt)).all() as DiaryRow[];
 
   const rows = await db.select({
     id: schema.foodEntries.id, diaryEntryId: schema.foodEntries.diaryEntryId,
