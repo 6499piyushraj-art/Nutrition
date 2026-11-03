@@ -152,13 +152,15 @@ export async function POST(request: Request) {
     } else {
       await db.insert(schema.nutrientTargets).values({ userId: session.user.id, targets }).run();
     }
-    await db.update(schema.healthProfiles).set({
-      dailyCalorieGoal: targets.calories,
+    const profileUpdates: Record<string, number | undefined> = {
       goalProteinG: targets.protein,
       goalCarbsG: targets.carbs,
       goalFatG: targets.fat,
       goalFiberG: targets.fiber,
-    }).where(eq(schema.healthProfiles.userId, session.user.id)).run();
+    };
+    if (!minor) profileUpdates.dailyCalorieGoal = targets.calories;
+    await db.update(schema.healthProfiles).set(profileUpdates)
+      .where(eq(schema.healthProfiles.userId, session.user.id)).run();
     return NextResponse.json({ success: true, targets });
   } catch (err) {
     return NextResponse.json({ error: 'Failed to save nutrient targets: ' + (err instanceof Error ? err.message : 'Unknown') }, { status: 500 });
