@@ -21,6 +21,10 @@ export interface StrippedFood {
   nutrient_source?: string;
 }
 
+export function isValidFoodBarcode(value: string): boolean {
+  return /^(?:[0-9]{8}|[0-9]{12,14})$/.test(value);
+}
+
 export interface SearchResult {
   query: string;
   total: number;
@@ -108,7 +112,7 @@ const INDIAN_SEARCH_ALIASES: Array<[string, string]> = [
   ['nariyal', 'coconut'], ['badam', 'almond'], ['dal', 'lentils'],
 ];
 
-function normalizeIndianFoodQuery(query: string): string {
+export function normalizeIndianFoodQuery(query: string): string {
   let value = query.trim();
   for (const [source, replacement] of INDIAN_SEARCH_ALIASES) {
     // Alias entries contain plain words/spaces, so no regular-expression escaping is needed.
@@ -192,7 +196,7 @@ export async function lookupBarcodeOpenFoodFacts(upc: string): Promise<StrippedF
 }
 
 export async function lookupBarcode(upc: string): Promise<{ food: StrippedFood; source: string } | null> {
-  if (!/^(?:[0-9]{8}|[0-9]{12,14})$/.test(upc)) return null;
+  if (!isValidFoodBarcode(upc)) return null;
   if (process.env.FATSECRET_CLIENT_ID) {
     const { lookupBarcodeFatSecret } = await import('./fatsecret');
     const fs = await lookupBarcodeFatSecret(upc);
