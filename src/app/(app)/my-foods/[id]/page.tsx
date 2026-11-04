@@ -23,8 +23,9 @@ export default async function FoodDetailPage({ params, searchParams }: Props) {
   const { id } = await params;
   const { from, logDate: requestedLogDate } = await searchParams;
   const logDate = requestedLogDate && validIsoDate(requestedLogDate) ? requestedLogDate : null;
-  const backHref = from || (logDate ? '/my-foods?logDate=' + encodeURIComponent(logDate) : '/my-foods');
-  const backLabel = from?.startsWith('/diary') ? 'Back to Diary' : 'My Foods';
+  const safeFrom = from && from.startsWith('/') && !from.startsWith('//') ? from : null;
+  const backHref = safeFrom || (logDate ? '/my-foods?logDate=' + encodeURIComponent(logDate) : '/my-foods');
+  const backLabel = safeFrom?.startsWith('/diary') ? 'Back to Diary' : 'My Foods';
 
   const foodRow = await db.select().from(schema.foods).where(and(eq(schema.foods.id, id), eq(schema.foods.userId, session.user.id), isNull(schema.foods.deletedAt))).get();
   if (!foodRow) redirect('/my-foods');
