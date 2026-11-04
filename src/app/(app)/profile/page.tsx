@@ -67,6 +67,15 @@ export default async function ProfilePage() {
 
   const profile = await getProfile(session.user.id);
   const isMinor = isUnder18OrUnknown(profile?.date_of_birth);
+  const profileForForm = isMinor && profile ? {
+    ...profile,
+    starting_weight_lbs: undefined,
+    current_weight_lbs: undefined,
+    goal_weight_lbs: undefined,
+    goal_target_date: undefined,
+    weekly_goal: undefined,
+    daily_calorie_goal: undefined,
+  } : profile;
   const weightHistory = isMinor ? [] : await getWeightHistory(session.user.id);
 
   return (
@@ -88,7 +97,7 @@ export default async function ProfilePage() {
 
       {/* Profile form */}
       <ProfileForm
-        profile={profile}
+        profile={profileForForm}
         isMinor={isMinor}
         userId={session.user.id}
         userEmail={session.user.email}
