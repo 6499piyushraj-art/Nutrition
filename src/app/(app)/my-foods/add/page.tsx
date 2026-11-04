@@ -10,6 +10,25 @@ const BarcodeScanner = lazy(() => import('@/components/food/BarcodeScanner'));
 
 type AddMode = 'choose' | 'manual' | 'usda' | 'barcode' | 'barcode-scan' | 'ai-choose' | 'ai-text' | 'ai-describe' | 'ai-photo-preview' | 'ai-photo';
 
+interface SavedFood {
+  id: string;
+  description: string;
+  brand_name: string | null;
+  source: string | null;
+  fdc_id: number | null;
+  default_serving_size: number | null;
+  default_serving_unit: string | null;
+  energy_kcal: number | null;
+  protein_g: number | null;
+  fat_g: number | null;
+  carbs_g: number | null;
+  fiber_g: number | null;
+  sugar_g: number | null;
+  sodium_mg: number | null;
+  nutrient_values: Record<string, number> | null;
+  nutrient_source: string | null;
+}
+
 interface ParsedFood {
   description: string;
   brand_name: string | null;
@@ -90,6 +109,7 @@ export default function AddFoodPage() {
   }, []);
 
   function updateForm(field: string, value: string) {
+    setCreatedFood(null);
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
@@ -127,8 +147,8 @@ export default function AddFoodPage() {
       description: food.description,
       brand_name: food.brand,
       barcode: food.upc,
-      default_serving_size: food.serving_size?.toString() || '',
-      default_serving_unit: food.serving_unit || 'g',
+      default_serving_size: food.serving_size?.toString() || (food.data_type === 'Branded' ? '1' : '100'),
+      default_serving_unit: food.serving_unit || (food.data_type === 'Branded' ? 'serving' : 'g'),
       energy_kcal: food.calories?.toString() || '',
       protein_g: food.protein_g?.toString() || '',
       fat_g: food.fat_g?.toString() || '',
@@ -860,6 +880,11 @@ export default function AddFoodPage() {
   const resetForm = () => {
     setForm({ description: '', brand_name: '', barcode: '', default_serving_size: '', default_serving_unit: 'g', energy_kcal: '', protein_g: '', fat_g: '', saturated_fat_g: '', carbs_g: '', fiber_g: '', sugar_g: '', sodium_mg: '', cholesterol_mg: '' });
     setFormTags([]);
+    setCreatedFood(null);
+    setFoodFdcId(null);
+    setFoodSource('manual');
+    setNutrientValues(null);
+    setNutrientSource(null);
     setError('');
   };
 
