@@ -42,6 +42,6 @@ export default function ReportsPage() {
       </div>
       <button onClick={()=>window.print()} className="min-h-[44px] w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700">Print this page / Save as PDF</button>
     </div>
-    <p className="text-xs text-gray-500">Food and measurement exports use the selected date range. Full account backup includes all dates and all user-owned app records, but excludes passwords and authentication tokens. Unknown food nutrients remain blank.</p>
+    <p className="text-xs text-gray-500">Food and measurement exports use the selected date range. For accounts under 18 or without a verified adult age, measurement exports include height only. Full account backup includes all dates and user-owned records, but excludes password hashes and authentication tokens. Unknown food nutrients remain blank.</p>
   </section>;
 }
