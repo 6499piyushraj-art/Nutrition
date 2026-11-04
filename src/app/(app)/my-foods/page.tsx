@@ -60,7 +60,7 @@ export default function MyFoodsPage() {
       <div className="flex items-center justify-between mb-4">
         <div><h1 className="text-xl font-bold text-gray-900">My Foods</h1>{logDate && <p className="mt-1 text-xs text-brand-700">Choose a saved food to add to your diary for {logDate}.</p>}</div>
         <Link
-          href="/my-foods/add"
+          href={logDate ? `/my-foods/add?logDate=${encodeURIComponent(logDate)}` : "/my-foods/add"}
           className="bg-brand-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold flex items-center gap-1.5 active:bg-brand-800 min-h-[44px]"
         >
           <Plus size={18} />
