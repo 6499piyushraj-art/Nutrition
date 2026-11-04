@@ -29,7 +29,7 @@ export async function PATCH(request: Request, { params }: Context) {
     updates.entryDate = body.entry_date;
   }
   if (body.entry_time !== undefined) {
-    if (typeof body.entry_time !== 'string' || !/^[0-2][0-9]:[0-5][0-9]$/.test(body.entry_time)) return NextResponse.json({ error: 'entry_time must use HH:MM.' }, { status: 400 });
+    if (typeof body.entry_time !== 'string' || !/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/.test(body.entry_time)) return NextResponse.json({ error: 'entry_time must use HH:MM.' }, { status: 400 });
     updates.entryTime = body.entry_time;
   }
   if (!Object.keys(updates).length) return NextResponse.json({ error: 'No fields to update.' }, { status: 400 });
