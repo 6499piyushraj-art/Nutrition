@@ -17,6 +17,15 @@ export default function ReportsPage() {
   const [kind, setKind] = useState<'food' | 'measurements' | 'all'>('food');
   const [error, setError] = useState('');
 
+  function printReport() {
+    setError('');
+    if (kind === 'all') { setError('Full account backup is JSON-only. Choose food history or measurements for a printable PDF.'); return; }
+    if (from > to) { setError('Start date must be before or equal to end date.'); return; }
+    const span = (new Date(to + 'T00:00:00Z').getTime() - new Date(from + 'T00:00:00Z').getTime()) / 86400000;
+    if (span > 365) { setError('Choose a period of 366 days or less.'); return; }
+    window.location.href = `/reports/print?kind=${kind}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  }
+
   function exportFile(format: 'csv' | 'json') {
     setError('');
     if (from > to) { setError('Start date must be before or equal to end date.'); return; }
@@ -40,7 +49,7 @@ export default function ReportsPage() {
         <button onClick={()=>exportFile('csv')} disabled={kind === 'all'} className="min-h-[48px] rounded-lg bg-brand-600 px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Export CSV</button>
         <button onClick={()=>exportFile('json')} className="min-h-[48px] rounded-lg border border-gray-300 px-4 py-3 font-semibold text-gray-700">Export JSON</button>
       </div>
-      <button onClick={()=>window.print()} className="min-h-[44px] w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700">Print this page / Save as PDF</button>
+      <button onClick={printReport} disabled={kind === 'all'} className="min-h-[48px] w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-40">Print / Save report as PDF</button>
     </div>
     <p className="text-xs text-gray-500">Food and measurement exports use the selected date range. For accounts under 18 or without a verified adult age, measurement exports include height only. Full account backup includes all dates and user-owned records, but excludes password hashes and authentication tokens. Unknown food nutrients remain blank.</p>
   </section>;
