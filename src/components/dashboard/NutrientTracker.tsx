@@ -60,9 +60,10 @@ export default function NutrientTracker() {
     } finally { setSaving(false); }
   }
 
-  const macroEnergy = useMemo(() => draft.protein * 4 + draft.carbs * 4 + draft.fat * 9, [draft]);
-  const calorieGap = draft.calories - macroEnergy;
-  const macroWarning = !data?.isMinor && Number.isFinite(calorieGap) && Math.abs(calorieGap) >= 50;
+  const macroEnergy = useMemo(() => (draft.protein ?? 0) * 4 + (draft.carbs ?? 0) * 4 + (draft.fat ?? 0) * 9, [draft]);
+  const hasComparableTargets = draft.calories !== null && draft.protein !== null && draft.carbs !== null && draft.fat !== null;
+  const calorieGap = hasComparableTargets ? (draft.calories as number) - macroEnergy : null;
+  const macroWarning = !data?.isMinor && calorieGap !== null && Number.isFinite(calorieGap) && Math.abs(calorieGap) >= 50;
 
   function card(key: Key) {
     const spec = NUTRIENT_SPECS.find((item) => item.key === key)!;
@@ -75,7 +76,7 @@ export default function NutrientTracker() {
       <div key={key} className="min-w-0 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
         <p className="text-xs font-medium text-gray-500">{spec.label}</p>
         <p className="mt-1 break-words text-lg font-bold text-gray-900">{valueText}</p>
-        <p className="mt-1 text-xs text-gray-400">{('isLimit' in spec && spec.isLimit) ? 'Reference limit: ≤ ' + fmt(draft[key], spec.unit) : 'Target: ' + fmt(draft[key], spec.unit)}</p>
+        <p className="mt-1 text-xs text-gray-400">{draft[key] === null ? 'Reference not set' : (('isLimit' in spec && spec.isLimit) ? 'Reference limit: ≤ ' + fmt(draft[key] as number, spec.unit) : 'Target: ' + fmt(draft[key] as number, spec.unit))}</p>
         {status === 'partial' && result && <p className="mt-1 text-xs text-amber-700">Incomplete data ({result.knownFoods}/{result.totalFoods} foods); daily total unavailable.</p>}
         {status === 'complete' && result && <p className="mt-1 text-[11px] text-gray-400">{confidenceLabel(result.confidence)}</p>}
       </div>
@@ -119,15 +120,15 @@ export default function NutrientTracker() {
             </summary>
             {editing && <form onSubmit={saveTargets} className="mt-4 space-y-4">
               <p className="text-xs text-gray-500">Edit any target. These general reference values are not medical prescriptions.</p>
-              {(['macro', 'essential'] as const).map((group) => (
+              {(['macro', 'essential', 'extended'] as const).map((group) => (
                 <div key={group}>
-                  <h4 className="mb-2 text-sm font-semibold text-gray-700">{group === 'macro' ? 'Energy & macros' : 'Essential micronutrients'}</h4>
+                  <h4 className="mb-2 text-sm font-semibold text-gray-700">{group === 'macro' ? 'Energy & macros' : group === 'essential' ? 'Essential micronutrients' : 'Extended micronutrients'}</h4>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {NUTRIENT_SPECS.filter((spec) => spec.group === group && !(data?.isMinor && spec.key === 'calories')).map((spec) => (
                       <label key={spec.key} className="block text-sm text-gray-700">
                         <span className="flex items-baseline justify-between gap-2"><span className="font-medium">{spec.label}{('isLimit' in spec && spec.isLimit) ? ' limit' : ''}</span><span className="text-xs text-gray-500">{spec.unit}</span></span>
-                        <input type="number" min="0" step="any" required value={draft[spec.key as Key]}
-                          onChange={(event) => { const value = event.target.value === '' ? 0 : Number(event.target.value); setDraft((prev) => ({ ...prev, [spec.key]: value })); setSaved(false); }}
+                        <input type="number" min="0" step="any" required value={draft[spec.key as Key] ?? ''}
+                          onChange={(event) => { const value = event.target.value === '' ? null : Number(event.target.value); setDraft((prev) => ({ ...prev, [spec.key]: value })); setSaved(false); }}
                           className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
                         {'targetHint' in spec && spec.targetHint && <span className="mt-1 block text-xs text-gray-500">{spec.targetHint}</span>}
                       </label>
