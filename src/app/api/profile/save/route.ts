@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { and, eq } from 'drizzle-orm';
 import { getDefaultNutrientTargets, NUTRIENT_SPECS } from '@/lib/nutrients';
+import { validIsoDate } from '@/lib/nutrition-calculator';
 import { ageFromDateOfBirth } from '@/lib/nutrition-calculator';
 
 const fields: Record<string, string> = {
@@ -34,6 +35,9 @@ export async function POST(request: Request) {
     const body = await request.json() as Record<string, unknown>;
     const { profileId, ...data } = body;
     const update = toCamel(data);
+    if (update.dateOfBirth !== undefined && (typeof update.dateOfBirth !== 'string' || !validIsoDate(update.dateOfBirth))) {
+      return NextResponse.json({ error: 'Date of birth must be a valid calendar date in YYYY-MM-DD format.' }, { status: 400 });
+    }
     const existing = await db.select().from(schema.healthProfiles)
       .where(eq(schema.healthProfiles.userId, session.user.id)).get();
     if (profileId && (!existing || existing.id !== profileId)) {
