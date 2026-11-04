@@ -112,7 +112,7 @@ export default function NutrientTracker() {
           </div>
           {macroWarning && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-semibold">Calorie consistency check</p>
-            <p className="mt-1">Your macro targets provide about {Math.round(macroEnergy).toLocaleString()} kcal (protein × 4 + carbs × 4 + fat × 9), {Math.round(Math.abs(calorieGap)).toLocaleString()} kcal {calorieGap > 0 ? 'below' : 'above'} your {Math.round(draft.calories).toLocaleString()} kcal target. No target was changed automatically.</p>
+            <p className="mt-1">Your macro targets provide about {Math.round(macroEnergy).toLocaleString()} kcal (protein × 4 + carbs × 4 + fat × 9), {Math.round(Math.abs(calorieGap as number)).toLocaleString()} kcal {(calorieGap as number) > 0 ? 'below' : 'above'} your {Math.round(draft.calories as number).toLocaleString()} kcal target. No target was changed automatically.</p>
           </div>}
           <details open={editing} className="rounded-2xl bg-white p-4 shadow-sm">
             <summary onClick={(event) => { event.preventDefault(); setEditing((current) => !current); }} className="flex cursor-pointer list-none items-center gap-2 font-semibold text-gray-800">
