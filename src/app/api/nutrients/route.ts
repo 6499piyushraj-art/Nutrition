@@ -63,6 +63,7 @@ export async function GET(request: Request) {
   const now = new Date();
   const defaultDate = String(now.getFullYear()) + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
   const date = searchParams.get('date') || defaultDate;
+  if (!validIsoDate(date)) return NextResponse.json({ error: 'date must be YYYY-MM-DD.' }, { status: 400 });
   try {
     const profileAge = await db.select({ dateOfBirth: schema.healthProfiles.dateOfBirth, sex: schema.healthProfiles.sex }).from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();
     const isMinor = isUnder18OrUnknown(profileAge?.dateOfBirth);
@@ -108,7 +109,7 @@ export async function GET(request: Request) {
         valuesAreConfigurable: true,
         referenceNotPrescription: true,
         sodiumIsLimit: true,
-        microSourcePolicy: 'Only food-composition data attached to saved foods is counted; Gemini does not invent micronutrient values.',
+        microSourcePolicy: 'Food-composition values keep their source. Gemini-derived nutrient values are labelled AI-estimated and remain null when the model cannot estimate them reliably.',
       },
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (err) {
@@ -133,7 +134,7 @@ export async function POST(request: Request) {
     const saved = previous?.targets && typeof previous.targets === 'object' && !Array.isArray(previous.targets)
       ? previous.targets as Record<string, unknown>
       : {};
-    const targets: Record<string, number> = Object.fromEntries(NUTRIENT_SPECS.map((spec) => {
+    const targets: Record<string, number | null> = Object.fromEntries(NUTRIENT_SPECS.map((spec) => {
       const value = saved[spec.key];
       return [spec.key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
     }));
@@ -142,6 +143,7 @@ export async function POST(request: Request) {
     const minor = isUnder18OrUnknown(dob);
     for (const [key, value] of Object.entries(body.targets as Record<string, unknown>)) {
       if (!allowed.has(key as never) || (minor && key === 'calories')) continue;
+      if (value === null) { targets[key] = null; continue; }
       if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 10000000) {
         return NextResponse.json({ error: 'Target values must be finite, non-negative numbers.' }, { status: 400 });
       }
@@ -153,7 +155,7 @@ export async function POST(request: Request) {
     } else {
       await db.insert(schema.nutrientTargets).values({ userId: session.user.id, targets }).run();
     }
-    const profileUpdates: Record<string, number | undefined> = {
+    const profileUpdates: Record<string, number | null | undefined> = {
       goalProteinG: targets.protein,
       goalCarbsG: targets.carbs,
       goalFatG: targets.fat,
