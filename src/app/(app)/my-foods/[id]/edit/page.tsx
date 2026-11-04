@@ -43,7 +43,7 @@ export default function EditFoodPage() {
         setForm({
           description: f.description || '',
           brand_name: f.brand_name || '',
-          barcode: f.barcode || '',
+          barcode: f.upc_code || '',
           default_serving_size: f.default_serving_size?.toString() || '',
           default_serving_unit: f.default_serving_unit || 'g',
           energy_kcal: f.energy_kcal?.toString() || '',
@@ -85,7 +85,7 @@ export default function EditFoodPage() {
         body: JSON.stringify({
           description: form.description.trim(),
           brand_name: form.brand_name.trim() || null,
-          barcode: form.barcode.trim() || null,
+          upc_code: form.barcode.trim() || null,
           default_serving_size: form.default_serving_size ? parseFloat(form.default_serving_size) : null,
           default_serving_unit: form.default_serving_unit || null,
           energy_kcal: form.energy_kcal ? parseFloat(form.energy_kcal) : null,
