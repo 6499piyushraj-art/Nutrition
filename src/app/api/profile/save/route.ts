@@ -56,26 +56,17 @@ export async function POST(request: Request) {
 
     const saved = await db.select().from(schema.healthProfiles)
       .where(eq(schema.healthProfiles.userId, session.user.id)).get();
-    const previous = await db.select().from(schema.nutrientTargets)
-      .where(eq(schema.nutrientTargets.userId, session.user.id)).get();
-    const defaults = getDefaultNutrientTargets(saved);
-    const stored = previous?.targets && typeof previous.targets === 'object' && !Array.isArray(previous.targets)
-      ? previous.targets as Record<string, unknown> : {};
-    const targets = Object.fromEntries(NUTRIENT_SPECS.map((spec) => {
-      const value = stored[spec.key];
-      return [spec.key, value === null ? null : typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
-    })) as ReturnType<typeof getDefaultNutrientTargets>;
+    const previous = await db.select({ id: schema.nutrientTargets.id })
+      .from(schema.nutrientTargets).where(eq(schema.nutrientTargets.userId, session.user.id)).get();
 
-    if (saved) {
-      targets.protein = saved.goalProteinG ?? targets.protein;
-      targets.carbs = saved.goalCarbsG ?? targets.carbs;
-      targets.fat = saved.goalFatG ?? targets.fat;
-      targets.fiber = saved.goalFiberG ?? targets.fiber;
-      if (age === null || age >= 18) targets.calories = saved.dailyCalorieGoal ?? targets.calories;
+    // Nutrient targets are owned by /api/nutrients. Profile saves must not
+    // overwrite an explicitly unset target with legacy profile form defaults.
+    if (!previous) {
+      await db.insert(schema.nutrientTargets).values({
+        userId: session.user.id,
+        targets: getDefaultNutrientTargets(saved),
+      }).run();
     }
-    if (previous) await db.update(schema.nutrientTargets).set({ targets, updatedAt: new Date().toISOString() })
-      .where(eq(schema.nutrientTargets.userId, session.user.id)).run();
-    else await db.insert(schema.nutrientTargets).values({ userId: session.user.id, targets }).run();
 
     return NextResponse.json({ profile: toSnake(profile as unknown as Record<string, unknown>) });
   } catch {
