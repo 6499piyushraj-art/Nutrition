@@ -8,6 +8,8 @@ interface NutrientSummary { value: number | null; status: NutrientStatus; confid
 interface ApiData { date: string; targets: NutrientTargets; nutrition: Record<string, NutrientSummary>; foodsLogged: number; isMinor?: boolean; targetNotes?: { referenceSource?: { name: string; year: number; sourceUrl: string; populationGroup: string } }; }
 type Key = keyof NutrientTargets;
 
+function localIsoDate() { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
+
 function fmt(value: number, unit: string) {
   const whole = unit === 'kcal' || unit === 'mg';
   const rounded = Math.round(value * (whole ? 1 : 100)) / (whole ? 1 : 100);
@@ -35,7 +37,7 @@ export default function NutrientTracker() {
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const res = await fetch('/api/nutrients?_t=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' });
+      const res = await fetch('/api/nutrients?date=' + localIsoDate() + '&_t=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' });
       const result = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(result.error || 'Could not load nutrient summary');
       setData(result as ApiData); setDraft(result.targets as NutrientTargets);
