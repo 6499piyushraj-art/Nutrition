@@ -23,6 +23,12 @@ export default function MyFoodsPage() {
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [allTags, setAllTags] = useState<{ name: string; color: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [logDate, setLogDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    const date = new URLSearchParams(window.location.search).get('logDate');
+    if (date && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(date)) setLogDate(date);
+  }, []);
 
   const fetchFoods = useCallback(async () => {
     setLoading(true);
@@ -52,7 +58,7 @@ export default function MyFoodsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-gray-900">My Foods</h1>
+        <div><h1 className="text-xl font-bold text-gray-900">My Foods</h1>{logDate && <p className="mt-1 text-xs text-brand-700">Choose a saved food to add to your diary for {logDate}.</p>}</div>
         <Link
           href="/my-foods/add"
           className="bg-brand-600 text-white rounded-lg px-4 py-2.5 text-sm font-semibold flex items-center gap-1.5 active:bg-brand-800 min-h-[44px]"
@@ -129,7 +135,7 @@ export default function MyFoodsPage() {
           {foods.map((food) => (
             <Link
               key={food.id}
-              href={`/my-foods/${food.id}`}
+              href={logDate ? `/my-foods/${food.id}?logDate=${encodeURIComponent(logDate)}` : `/my-foods/${food.id}`}
               className="block bg-white rounded-xl p-4 shadow-sm active:bg-gray-50"
             >
               <p className="font-medium text-gray-900 text-base">{food.description}</p>
