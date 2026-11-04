@@ -6,6 +6,9 @@ import { validIsoDate } from '@/lib/nutrition-calculator';
 
 export const dynamic = 'force-dynamic';
 
+type DebugEntry = { id: string; diaryMeal: string | null; totalCalories: number | null };
+type DebugFoodRow = { diaryEntryId: string; id: string; quantity: number; energyKcal: number | null; foodDescription: string | null };
+
 export async function GET(request: Request) {
   if (process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'Not found.' }, { status: 404 });
@@ -18,7 +21,7 @@ export async function GET(request: Request) {
   if (!date || !validIsoDate(date)) return NextResponse.json({ error: 'A valid date is required.' }, { status: 400 });
 
   try {
-    const entries = await db.select({
+    const entries: DebugEntry[] = await db.select({
       id: schema.diaryEntries.id,
       diaryMeal: schema.diaryEntries.diaryMeal,
       totalCalories: schema.diaryEntries.totalCalories,
@@ -29,7 +32,7 @@ export async function GET(request: Request) {
     )).all();
 
     const entryIds = entries.map((entry) => entry.id);
-    const foodRows = entryIds.length ? await db.select({
+    const foodRows: DebugFoodRow[] = entryIds.length ? await db.select({
       diaryEntryId: schema.foodEntries.diaryEntryId,
       id: schema.foodEntries.id,
       quantity: schema.foodEntries.quantity,
