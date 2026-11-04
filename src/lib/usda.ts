@@ -90,12 +90,46 @@ function stripFood(food: Record<string, unknown>): StrippedFood {
   };
 }
 
-export async function searchUSDA(query: string, limit = 10, dataTypes?: string[]): Promise<SearchResult> {
+const INDIAN_SEARCH_ALIASES: Array<[string, string]> = [
+  ['moong dal', 'mung beans'], ['mung dal', 'mung beans'],
+  ['toor dal', 'pigeon peas'], ['arhar dal', 'pigeon peas'],
+  ['masoor dal', 'red lentils'], ['urad dal', 'black gram'],
+  ['chana dal', 'split chickpeas'], ['kabuli chana', 'chickpeas'],
+  ['moongfali', 'peanuts'], ['groundnut', 'peanuts'],
+  ['rajma', 'kidney beans'], ['chole', 'chickpeas'],
+  ['chawal', 'rice'], ['doodh', 'milk'], ['dahi', 'yogurt'],
+  ['curd', 'yogurt'], ['roti', 'whole wheat flatbread'],
+  ['chapati', 'whole wheat flatbread'], ['atta', 'whole wheat flour'],
+  ['poha', 'flattened rice'], ['upma', 'semolina'],
+  ['bhindi', 'okra'], ['baingan', 'eggplant'], ['palak', 'spinach'],
+  ['lauki', 'bottle gourd'], ['karela', 'bitter melon'],
+  ['aloo', 'potato'], ['matar', 'green peas'], ['gobi', 'cauliflower'],
+  ['kela', 'banana'], ['seb', 'apple'], ['amla', 'Indian gooseberry'],
+  ['nariyal', 'coconut'], ['badam', 'almond'], ['dal', 'lentils'],
+];
+
+function normalizeIndianFoodQuery(query: string): string {
+  let value = query.trim();
+  for (const [source, replacement] of INDIAN_SEARCH_ALIASES) {
+    const escaped = source.replace(/[.*+?^${}()|[\]\\]/g, '\\export async function searchUSDA(query: string, limit = 10, dataTypes?: string[]): Promise<SearchResult> {
   const types = dataTypes || ['Branded', 'Survey (FNDDS)'];
   const safeQuery = query.trim();
   if (!safeQuery) return { query, total: 0, results: [] };
 
-  const cacheKey = JSON.stringify([safeQuery.toLowerCase(), Math.min(limit, 25), types]);
+  const cacheKey = JSON.stringify([safeQuery.toLowerCase(), Math.min(limit, 25), types]);');
+    value = value.replace(new RegExp('\\\\b' + escaped + '\\\\b', 'gi'), replacement);
+  }
+  return value;
+}
+
+export async function searchUSDA(query: string, limit = 10, dataTypes?: string[]): Promise<SearchResult> {
+  const types = dataTypes || ['Foundation', 'SR Legacy', 'Survey (FNDDS)', 'Branded'];
+  const originalQuery = query.trim();
+  const safeQuery = normalizeIndianFoodQuery(originalQuery);
+  if (!safeQuery) return { query: originalQuery, total: 0, results: [] };
+  const safeLimit = Math.max(1, Math.min(Number.isFinite(limit) ? Math.floor(limit) : 10, 25));
+
+  const cacheKey = JSON.stringify([safeQuery.toLowerCase(), safeLimit, types]);
   const cached = SEARCH_CACHE.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.result;
   if (cached) SEARCH_CACHE.delete(cacheKey);
@@ -105,7 +139,7 @@ export async function searchUSDA(query: string, limit = 10, dataTypes?: string[]
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       query: safeQuery,
-      pageSize: Math.min(limit, 25),
+      pageSize: safeLimit,
       dataType: types,
     }),
     signal: AbortSignal.timeout(5000),
@@ -117,7 +151,7 @@ export async function searchUSDA(query: string, limit = 10, dataTypes?: string[]
 
   const data = await res.json();
   const result: SearchResult = {
-    query: safeQuery,
+    query: originalQuery,
     total: data.totalHits || 0,
     results: ((data.foods || []) as Record<string, unknown>[]).map(stripFood),
   };
@@ -131,8 +165,8 @@ export async function searchUSDA(query: string, limit = 10, dataTypes?: string[]
 
 export async function lookupBarcodeOpenFoodFacts(upc: string): Promise<StrippedFood | null> {
   const res = await fetch(
-    `http://world.openfoodfacts.org/api/v2/product/${upc}.json?fields=product_name,brands,serving_size,serving_quantity,nutriments`,
-  );
+    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(upc)}.json?fields=product_name,brands,serving_size,serving_quantity,nutriments`,
+  , { signal: AbortSignal.timeout(5000) });
 
   if (!res.ok) return null;
 
