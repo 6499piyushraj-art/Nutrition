@@ -41,6 +41,26 @@ export default function AnalysisPage() {
     return () => { active = false; };
   }, [period]);
 
+  useEffect(() => {
+    let active = true;
+    setContributorLoading(true);
+    setContributorError('');
+    const params = new URLSearchParams({ date: contributorDate, nutrient: selectedNutrient });
+    fetch('/api/v1/nutrients/contributors?' + params.toString(), {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    })
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Could not load food contributions.');
+        return result as Contributors;
+      })
+      .then((result) => { if (active) setContributorData(result); })
+      .catch((err) => { if (active) setContributorError(err instanceof Error ? err.message : 'Could not load food contributions.'); })
+      .finally(() => { if (active) setContributorLoading(false); });
+    return () => { active = false; };
+  }, [contributorDate, selectedNutrient]);
+
   return (
     <section className="space-y-4 pb-24">
       <div>
