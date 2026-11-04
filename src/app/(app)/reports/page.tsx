@@ -37,7 +37,7 @@ export default function ReportsPage() {
       <label className="block text-sm font-medium text-gray-700">To<input type="date" value={to} max={today()} disabled={kind === 'all'} onChange={(e)=>setTo(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-3"/></label>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       <div className="grid grid-cols-2 gap-3">
-        <button onClick={()=>exportFile('csv')} className="min-h-[48px] rounded-lg bg-brand-600 px-4 py-3 font-semibold text-white">Export CSV</button>
+        <button onClick={()=>exportFile('csv')} disabled={kind === 'all'} className="min-h-[48px] rounded-lg bg-brand-600 px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Export CSV</button>
         <button onClick={()=>exportFile('json')} className="min-h-[48px] rounded-lg border border-gray-300 px-4 py-3 font-semibold text-gray-700">Export JSON</button>
       </div>
       <button onClick={()=>window.print()} className="min-h-[44px] w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700">Print this page / Save as PDF</button>
