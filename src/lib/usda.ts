@@ -51,7 +51,7 @@ const FDC_MICRONUTRIENT_MAP: Record<number, { key: string; factor: number }> = {
   1176: { key: 'biotin', factor: 1 },
 };
 
-function stripFood(food: Record<string, unknown>): StrippedFood {
+export function stripFood(food: Record<string, unknown>): StrippedFood {
   const nutrients: Record<string, number> = {};
   const nutrientValues: Record<string, number> = {};
   const foodNutrients = (food.foodNutrients || []) as Record<string, unknown>[];
