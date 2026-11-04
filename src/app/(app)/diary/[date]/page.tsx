@@ -148,12 +148,20 @@ export default function DiaryDatePage() {
             <h2 className="font-semibold text-gray-900">Food Log</h2>
             <p className="text-xs text-gray-500 mt-0.5">Hindi, Hinglish ya English mein food likhkar log karo</p>
           </div>
-          <Link
-            href={'/diary/add-food?date=' + date}
-            className="bg-brand-600 text-white rounded-lg px-3 py-2 text-sm font-semibold min-h-[40px] flex items-center justify-center"
-          >
-            + Log Food
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={'/my-foods/add?logDate=' + date}
+              className="rounded-lg border border-brand-300 bg-white px-3 py-2 text-xs font-semibold text-brand-700 min-h-[40px] flex items-center justify-center"
+            >
+              + Search / Manual
+            </Link>
+            <Link
+              href={'/diary/add-food?date=' + date}
+              className="bg-brand-600 text-white rounded-lg px-3 py-2 text-xs font-semibold min-h-[40px] flex items-center justify-center"
+            >
+              AI Log
+            </Link>
+          </div>
         </div>
 
         {loading ? (
