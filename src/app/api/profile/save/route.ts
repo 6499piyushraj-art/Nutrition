@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       ? previous.targets as Record<string, unknown> : {};
     const targets = Object.fromEntries(NUTRIENT_SPECS.map((spec) => {
       const value = stored[spec.key];
-      return [spec.key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
+      return [spec.key, value === null ? null : typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
     })) as ReturnType<typeof getDefaultNutrientTargets>;
 
     if (saved) {
