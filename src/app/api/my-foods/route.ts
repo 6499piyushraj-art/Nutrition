@@ -106,7 +106,11 @@ export async function GET(request: Request) {
           })
           .from(schema.foodsToFoodTags)
           .innerJoin(schema.foodTags, eq(schema.foodsToFoodTags.foodTagId, schema.foodTags.id))
-          .where(eq(schema.foodsToFoodTags.foodId, food.id));
+          .where(and(
+            eq(schema.foodsToFoodTags.foodId, food.id),
+            eq(schema.foodTags.userId, session.user.id),
+            isNull(schema.foodTags.deletedAt),
+          ));
 
         return {
           ...food,
