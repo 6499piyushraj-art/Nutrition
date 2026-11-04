@@ -1,7 +1,7 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { db, schema } from '@/lib/db';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import Link from 'next/link';
 import { Pencil } from 'lucide-react';
 import BackLink from '@/components/food/BackLink';
@@ -23,7 +23,7 @@ export default async function FoodDetailPage({ params, searchParams }: Props) {
   const backHref = from || '/my-foods';
   const backLabel = from?.startsWith('/diary') ? 'Back to Diary' : 'My Foods';
 
-  const foodRow = await db.select().from(schema.foods).where(eq(schema.foods.id, id)).get();
+  const foodRow = await db.select().from(schema.foods).where(and(eq(schema.foods.id, id), eq(schema.foods.userId, session.user.id), isNull(schema.foods.deletedAt))).get();
   if (!foodRow) redirect('/my-foods');
 
   const tagRows: Array<{ id: string; name: string; color: string | null }> = await db.select({
@@ -33,7 +33,7 @@ export default async function FoodDetailPage({ params, searchParams }: Props) {
   })
     .from(schema.foodsToFoodTags)
     .innerJoin(schema.foodTags, eq(schema.foodsToFoodTags.foodTagId, schema.foodTags.id))
-    .where(eq(schema.foodsToFoodTags.foodId, id))
+    .where(and(eq(schema.foodsToFoodTags.foodId, id), eq(schema.foodTags.userId, session.user.id), isNull(schema.foodTags.deletedAt)))
     .all();
 
   const food = {
