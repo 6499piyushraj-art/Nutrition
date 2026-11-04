@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { validIsoDate } from '@/lib/nutrition-calculator';
 
 export const dynamic = 'force-dynamic';
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     }).from(schema.foodEntries)
       .leftJoin(schema.foods, eq(schema.foodEntries.foodId, schema.foods.id))
       .where(and(
-        eq(schema.foodEntries.diaryEntryId, entryIds[0]),
+        inArray(schema.foodEntries.diaryEntryId, entryIds),
       )).all() : [];
 
     return NextResponse.json({
