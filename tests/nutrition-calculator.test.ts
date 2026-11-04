@@ -48,22 +48,21 @@ test('validates real ISO calendar dates', () => {
 
 test('uses the ICMR-NIN 2020 16–18 reference band for girls', () => {
   const targets = getDefaultNutrientTargets({ dateOfBirth: '2009-01-01', sex: 'F' });
-  assert.equal(targets.protein, 46);
-  assert.equal(targets.iron, 32);
-  assert.equal(targets.zinc, 14.2);
-  assert.equal(targets.folate, 270);
-  assert.equal(targets.vitamin_c, 70);
-  assert.equal(targets.vitamin_a, 860);
+  assert.equal(targets.protein, 37.3);
+  assert.equal(targets.iron, null);
+  assert.equal(targets.zinc, null);
+  assert.equal(targets.folate, null);
+  assert.equal(targets.vitamin_c, null);
+  assert.equal(targets.vitamin_a, null);
 });
 
 test('uses the ICMR-NIN 2020 16–18 reference band for boys', () => {
-  const { getDefaultNutrientTargets } = require('../src/lib/nutrients') as typeof import('../src/lib/nutrients');
   const targets = getDefaultNutrientTargets({ dateOfBirth: '2009-01-01', sex: 'M' });
-  assert.equal(targets.protein, 55);
-  assert.equal(targets.iron, 26);
-  assert.equal(targets.zinc, 17.6);
-  assert.equal(targets.folate, 340);
-  assert.equal(targets.vitamin_c, 85);
+  assert.equal(targets.protein, 45.1);
+  assert.equal(targets.iron, null);
+  assert.equal(targets.zinc, null);
+  assert.equal(targets.folate, null);
+  assert.equal(targets.vitamin_c, null);
 });
 
 test('falls back to unclassified references for invalid birth dates', () => {
@@ -79,4 +78,23 @@ test('classifies missing, malformed and underage birth dates conservatively', ()
   assert.equal(isUnder18OrUnknown('2009-01-01'), true);
   assert.equal(isVerifiedAdult('2000-01-01'), true);
   assert.equal(isVerifiedAdult('2010-01-01'), false);
+});
+
+
+test('does not invent adolescent micronutrient targets absent from the cited age band', () => {
+  const targets = getDefaultNutrientTargets({ dateOfBirth: '2009-01-01', sex: 'M' });
+  assert.equal(targets.protein, 45.1);
+  assert.equal(targets.calcium, null);
+  assert.equal(targets.magnesium, null);
+  assert.equal(targets.vitamin_e, null);
+});
+
+test('adds extended micronutrient keys without defaulting unknown targets to zero', () => {
+  const targets = getDefaultNutrientTargets({ dateOfBirth: '2000-01-01', sex: 'M' });
+  assert.equal(targets.phosphorus, null);
+  assert.equal(targets.potassium, null);
+  assert.equal(targets.chromium, null);
+  assert.equal(targets.molybdenum, null);
+  assert.equal(targets.vitamin_e, null);
+  assert.equal(targets.magnesium, 370);
 });
