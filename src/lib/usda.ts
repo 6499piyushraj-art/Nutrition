@@ -177,7 +177,7 @@ export async function lookupBarcodeOpenFoodFacts(upc: string): Promise<StrippedF
     brand: p.brands || '',
     upc,
     serving_size: p.serving_quantity || null,
-    serving_unit: p.serving_size ? p.serving_size.replace(/[0-9.]+\\s*/g, '').trim() || 'g' : 'g',
+    serving_unit: p.serving_size ? p.serving_size.replace(/[0-9.]+\s*/g, '').trim() || 'g' : 'g',
     data_type: 'OpenFoodFacts',
     calories: typeof (n['energy-kcal_serving'] ?? n['energy-kcal_100g']) === 'number' ? Math.round((n['energy-kcal_serving'] ?? n['energy-kcal_100g']) * 10) / 10 : null,
     protein_g: typeof (n.proteins_serving ?? n.proteins_100g) === 'number' ? Math.round((n.proteins_serving ?? n.proteins_100g) * 10) / 10 : null,
