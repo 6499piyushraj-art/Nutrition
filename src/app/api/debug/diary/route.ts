@@ -1,51 +1,61 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
-import { eq, and } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
+import { validIsoDate } from '@/lib/nutrition-calculator';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+  }
+
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'No session' });
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { searchParams } = new URL(request.url);
-  const date = searchParams.get('date') || '2026-04-13';
+  const date = new URL(request.url).searchParams.get('date');
+  if (!date || !validIsoDate(date)) return NextResponse.json({ error: 'A valid date is required.' }, { status: 400 });
 
-  const entries: Array<typeof schema.diaryEntries.$inferSelect> = await db.select().from(schema.diaryEntries)
-    .where(and(
+  try {
+    const entries = await db.select({
+      id: schema.diaryEntries.id,
+      diaryMeal: schema.diaryEntries.diaryMeal,
+      totalCalories: schema.diaryEntries.totalCalories,
+    }).from(schema.diaryEntries).where(and(
       eq(schema.diaryEntries.date, date),
       eq(schema.diaryEntries.userId, session.user.id),
       eq(schema.diaryEntries.type, 'diary_meal'),
     )).all();
 
-  const entriesWithFoods = await Promise.all(entries.map(async (entry) => {
-    const foodEntriesData: Array<{ id: string; quantity: number; energy_kcal: number | null; food_id: string | null; food_description: string | null }> = await db.select({
+    const entryIds = entries.map((entry) => entry.id);
+    const foodRows = entryIds.length ? await db.select({
+      diaryEntryId: schema.foodEntries.diaryEntryId,
       id: schema.foodEntries.id,
       quantity: schema.foodEntries.quantity,
-      energy_kcal: schema.foodEntries.energyKcal,
-      food_id: schema.foods.id,
-      food_description: schema.foods.description,
-    })
-      .from(schema.foodEntries)
+      energyKcal: schema.foodEntries.energyKcal,
+      foodDescription: schema.foods.description,
+    }).from(schema.foodEntries)
       .leftJoin(schema.foods, eq(schema.foodEntries.foodId, schema.foods.id))
-      .where(eq(schema.foodEntries.diaryEntryId, entry.id))
-      .all();
+      .where(and(
+        eq(schema.foodEntries.diaryEntryId, entryIds[0]),
+      )).all() : [];
 
-    return {
-      id: entry.id,
-      diary_meal: entry.diaryMeal,
-      total_calories: entry.totalCalories,
-      food_entries: foodEntriesData.map((fe) => ({
-        id: fe.id,
-        quantity: fe.quantity,
-        energy_kcal: fe.energy_kcal,
-        food: fe.food_id ? { id: fe.food_id, description: fe.food_description } : null,
+    return NextResponse.json({
+      entryCount: entries.length,
+      entries: entries.map((entry) => ({
+        id: entry.id,
+        diaryMeal: entry.diaryMeal,
+        totalCalories: entry.totalCalories,
+        foodEntries: foodRows.filter((row) => row.diaryEntryId === entry.id).map((row) => ({
+          id: row.id,
+          quantity: row.quantity,
+          energyKcal: row.energyKcal,
+          description: row.foodDescription,
+        })),
       })),
-    };
-  }));
-
-  return NextResponse.json({
-    userId: session.user.id,
-    entryCount: entriesWithFoods.length,
-    entries: entriesWithFoods,
-  });
+    }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch {
+    return NextResponse.json({ error: 'Could not load the local debug diary.' }, { status: 500 });
+  }
 }
