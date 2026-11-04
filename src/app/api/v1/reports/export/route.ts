@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
-import { validIsoDate } from '@/lib/nutrition-calculator';
+import { isUnder18OrUnknown, validIsoDate } from '@/lib/nutrition-calculator';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,6 +117,15 @@ export async function GET(request: Request) {
     }
 
     if (kind === 'measurements') {
+      const profile = await db.select({ dateOfBirth: schema.healthProfiles.dateOfBirth })
+        .from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();
+      const restrictWeight = isUnder18OrUnknown(profile?.dateOfBirth);
+      const measurementConditions = [
+        eq(schema.measurements.userId, session.user.id),
+        gte(schema.measurements.date, from),
+        lte(schema.measurements.date, to),
+      ];
+      if (restrictWeight) measurementConditions.push(eq(schema.measurements.type, 'height'));
       const rows: MeasurementExportRow[] = await db.select({
         date: schema.measurements.date,
         type: schema.measurements.type,
@@ -124,11 +133,7 @@ export async function GET(request: Request) {
         unit: schema.measurements.unit,
         notes: schema.measurements.notes,
       }).from(schema.measurements)
-        .where(and(
-          eq(schema.measurements.userId, session.user.id),
-          gte(schema.measurements.date, from),
-          lte(schema.measurements.date, to),
-        )).orderBy(asc(schema.measurements.date)).all() as MeasurementExportRow[];
+        .where(and(...measurementConditions)).orderBy(asc(schema.measurements.date)).all() as MeasurementExportRow[];
 
       if (format === 'json') {
         return new NextResponse(JSON.stringify({ kind, from, to, records: rows }, null, 2), {
