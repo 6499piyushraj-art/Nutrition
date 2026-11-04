@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Save } from 'lucide-react';
 
 interface ProfileData {
@@ -57,31 +57,11 @@ export default function ProfileForm({ profile, userId, userEmail, userName, isMi
     goal_fiber_g: profile?.goal_fiber_g?.toString() || '30',
     goal_sodium_mg: profile?.goal_sodium_mg?.toString() || '2300',
     goal_sugar_g: profile?.goal_sugar_g?.toString() || '50',
-    goal_water_oz: profile?.goal_water_oz?.toString() || '64',
-    daily_step_goal: profile?.daily_step_goal?.toString() || '10000',
+    goal_water_oz: profile?.goal_water_oz?.toString() || '',
+    daily_step_goal: profile?.daily_step_goal?.toString() || '',
     unit_system: profile?.unit_system || 'imperial',
   });
 
-  useEffect(() => {
-    let active = true;
-    fetch('/api/nutrients?_t=' + Date.now(), { cache: 'no-store' })
-      .then(async (res) => res.ok ? res.json() : null)
-      .then((data) => {
-        if (!active || !data?.targets) return;
-        const targets = data.targets as Record<string, number>;
-        setForm((prev) => ({
-          ...prev,
-          daily_calorie_goal: String(targets.calories ?? prev.daily_calorie_goal),
-          goal_protein_g: String(targets.protein ?? prev.goal_protein_g),
-          goal_carbs_g: String(targets.carbs ?? prev.goal_carbs_g),
-          goal_fat_g: String(targets.fat ?? prev.goal_fat_g),
-          goal_fiber_g: String(targets.fiber ?? prev.goal_fiber_g),
-          goal_sodium_mg: String(targets.sodium ?? prev.goal_sodium_mg),
-        }));
-      })
-      .catch(() => { /* Keep existing profile values if offline. */ });
-    return () => { active = false; };
-  }, []);
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -120,13 +100,6 @@ export default function ProfileForm({ profile, userId, userEmail, userName, isMi
         })(),
         activity_level: form.activity_level || null,
         weekly_goal: form.weekly_goal || null,
-        daily_calorie_goal: form.daily_calorie_goal ? parseInt(form.daily_calorie_goal) : null,
-        goal_protein_g: form.goal_protein_g ? parseFloat(form.goal_protein_g) : null,
-        goal_carbs_g: form.goal_carbs_g ? parseFloat(form.goal_carbs_g) : null,
-        goal_fat_g: form.goal_fat_g ? parseFloat(form.goal_fat_g) : null,
-        goal_fiber_g: form.goal_fiber_g ? parseFloat(form.goal_fiber_g) : null,
-        goal_sodium_mg: form.goal_sodium_mg ? parseFloat(form.goal_sodium_mg) : null,
-        goal_sugar_g: form.goal_sugar_g ? parseFloat(form.goal_sugar_g) : null,
         goal_water_oz: form.goal_water_oz ? parseFloat(form.goal_water_oz) : null,
         daily_step_goal: form.daily_step_goal ? parseInt(form.daily_step_goal) : null,
         unit_system: form.unit_system || 'imperial',
@@ -284,62 +257,20 @@ export default function ProfileForm({ profile, userId, userEmail, userName, isMi
         </>
       )}
 
-      {/* Daily Targets */}
+      {/* Daily Habits */}
       <div className="bg-white rounded-2xl p-5 shadow-sm">
-        <h2 className="font-semibold text-gray-800 mb-3">Daily Targets</h2>
-        <div className="space-y-3">
-          {!isMinor && (
+        <h2 className="font-semibold text-gray-800 mb-1">Daily Habits</h2>
+        <p className="mb-3 text-xs text-gray-500">Optional personal reminders. These are not nutrition prescriptions or exercise requirements.</p>
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Calories</label>
-            <input type="number" value={form.daily_calorie_goal} onChange={(e) => update('daily_calorie_goal', e.target.value)}
-              className="w-full rounded-lg border-2 border-orange-200 px-3 py-3 text-lg font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+            <label className="block text-xs font-medium text-gray-500 mb-1">Water reminder (oz)</label>
+            <input type="number" min="0" max="1000" step="any" value={form.goal_water_oz} onChange={(e) => update('goal_water_oz', e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
-          )}
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Protein (g)</label>
-              <input type="number" value={form.goal_protein_g} onChange={(e) => update('goal_protein_g', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Carbs (g)</label>
-              <input type="number" value={form.goal_carbs_g} onChange={(e) => update('goal_carbs_g', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Fat (g)</label>
-              <input type="number" value={form.goal_fat_g} onChange={(e) => update('goal_fat_g', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Fiber (g)</label>
-              <input type="number" value={form.goal_fiber_g} onChange={(e) => update('goal_fiber_g', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Sugar (g)</label>
-              <input type="number" value={form.goal_sugar_g} onChange={(e) => update('goal_sugar_g', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Sodium (mg)</label>
-              <input type="number" value={form.goal_sodium_mg} onChange={(e) => update('goal_sodium_mg', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Water (oz)</label>
-              <input type="number" value={form.goal_water_oz} onChange={(e) => update('goal_water_oz', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Steps</label>
-              <input type="number" value={form.daily_step_goal} onChange={(e) => update('daily_step_goal', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Step reminder</label>
+            <input type="number" min="0" max="100000" step="1" value={form.daily_step_goal} onChange={(e) => update('daily_step_goal', e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
         </div>
       </div>
