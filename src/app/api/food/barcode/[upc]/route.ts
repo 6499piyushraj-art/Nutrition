@@ -1,19 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { lookupBarcode } from '@/lib/usda';
+import { isValidFoodBarcode, lookupBarcode } from '@/lib/usda';
 
 export const dynamic = 'force-dynamic';
-
-function validBarcode(value: string): boolean {
-  return /^(?:[0-9]{8}|[0-9]{12,14})$/.test(value);
-}
 
 export async function GET(_request: Request, { params }: { params: Promise<{ upc: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { upc } = await params;
-  if (!validBarcode(upc)) return NextResponse.json({ error: 'Enter a valid 8, 12, 13 or 14 digit barcode.' }, { status: 400 });
+  if (!isValidFoodBarcode(upc)) return NextResponse.json({ error: 'Enter a valid 8, 12, 13 or 14 digit barcode.' }, { status: 400 });
 
   const rate = checkRateLimit('barcode-lookup:' + session.user.id, 30, 60 * 1000);
   if (!rate.allowed) return NextResponse.json({ error: 'Too many barcode lookups. Try again shortly.' }, {
