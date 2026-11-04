@@ -1,17 +1,19 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { db, schema } from '@/lib/db';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import Link from 'next/link';
 import { Pencil } from 'lucide-react';
 import BackLink from '@/components/food/BackLink';
 import DeleteFoodButton from '@/components/food/DeleteFoodButton';
+import LogSavedFoodButton from '@/components/food/LogSavedFoodButton';
+import { validIsoDate } from '@/lib/nutrition-calculator';
 
 export const dynamic = 'force-dynamic';
 
 interface Props {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string; logDate?: string }>;
 }
 
 export default async function FoodDetailPage({ params, searchParams }: Props) {
@@ -19,11 +21,13 @@ export default async function FoodDetailPage({ params, searchParams }: Props) {
   if (!session) redirect('/login');
 
   const { id } = await params;
-  const { from } = await searchParams;
-  const backHref = from || '/my-foods';
-  const backLabel = from?.startsWith('/diary') ? 'Back to Diary' : 'My Foods';
+  const { from, logDate: requestedLogDate } = await searchParams;
+  const logDate = requestedLogDate && validIsoDate(requestedLogDate) ? requestedLogDate : null;
+  const safeFrom = from && from.startsWith('/') && !from.startsWith('//') ? from : null;
+  const backHref = safeFrom || (logDate ? '/my-foods?logDate=' + encodeURIComponent(logDate) : '/my-foods');
+  const backLabel = safeFrom?.startsWith('/diary') ? 'Back to Diary' : 'My Foods';
 
-  const foodRow = await db.select().from(schema.foods).where(eq(schema.foods.id, id)).get();
+  const foodRow = await db.select().from(schema.foods).where(and(eq(schema.foods.id, id), eq(schema.foods.userId, session.user.id), isNull(schema.foods.deletedAt))).get();
   if (!foodRow) redirect('/my-foods');
 
   const tagRows: Array<{ id: string; name: string; color: string | null }> = await db.select({
@@ -33,7 +37,7 @@ export default async function FoodDetailPage({ params, searchParams }: Props) {
   })
     .from(schema.foodsToFoodTags)
     .innerJoin(schema.foodTags, eq(schema.foodsToFoodTags.foodTagId, schema.foodTags.id))
-    .where(eq(schema.foodsToFoodTags.foodId, id))
+    .where(and(eq(schema.foodsToFoodTags.foodId, id), eq(schema.foodTags.userId, session.user.id), isNull(schema.foodTags.deletedAt)))
     .all();
 
   const food = {
@@ -51,6 +55,10 @@ export default async function FoodDetailPage({ params, searchParams }: Props) {
     default_serving_unit: foodRow.defaultServingUnit,
     barcode: foodRow.upcCode,
     deleted_at: foodRow.deletedAt,
+    source: foodRow.source,
+    fdc_id: foodRow.fdcId,
+    nutrient_values: foodRow.nutrientValues,
+    nutrient_source: foodRow.nutrientSource,
   };
 
   return (
@@ -77,6 +85,25 @@ export default async function FoodDetailPage({ params, searchParams }: Props) {
           Edit
         </Link>
       </div>
+
+      {logDate && <LogSavedFoodButton date={logDate} food={{
+        id: foodRow.id,
+        description: foodRow.description,
+        brandName: foodRow.brandName,
+        source: foodRow.source,
+        fdcId: foodRow.fdcId,
+        servingSize: foodRow.defaultServingSize,
+        servingUnit: foodRow.defaultServingUnit,
+        energyKcal: foodRow.energyKcal,
+        proteinG: foodRow.proteinG,
+        fatG: foodRow.totalFatG,
+        carbsG: foodRow.carbohydrateG,
+        fiberG: foodRow.dietaryFiberG,
+        sugarG: foodRow.totalSugarsG,
+        sodiumMg: foodRow.sodiumMg,
+        nutrientValues: foodRow.nutrientValues as Record<string, number> | null,
+        nutrientSource: foodRow.nutrientSource,
+      }} />}
 
       <div className="mt-4 bg-white rounded-xl p-4 shadow-sm">
         <h2 className="font-semibold text-gray-800 mb-3">Nutrition (per serving)</h2>

@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Sparkles, Loader2, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, Loader2, RotateCcw, CheckCircle2, Camera, X, Search, BookOpen } from 'lucide-react';
 
 interface ParsedFood {
   description: string;
@@ -20,6 +20,46 @@ interface ParsedFood {
   cholesterol_mg: number | null;
   nutrient_values?: Record<string, number | null> | null;
   nutrient_source?: string | null;
+  food_id?: string | null;
+  fdc_id?: number | null;
+  source?: string | null;
+  data_type?: string | null;
+}
+
+interface ManualFood {
+  id: string;
+  description: string;
+  brand_name: string | null;
+  source: string | null;
+  default_serving_size: number | null;
+  default_serving_unit: string | null;
+  energy_kcal: number | null;
+  protein_g: number | null;
+  fat_g: number | null;
+  carbs_g: number | null;
+  fiber_g: number | null;
+  sugar_g: number | null;
+  sodium_mg: number | null;
+  nutrient_values: Record<string, number> | null;
+  nutrient_source: string | null;
+}
+
+interface ExternalFood {
+  fdc_id: number;
+  description: string;
+  brand: string;
+  serving_size: number | null;
+  serving_unit: string;
+  data_type: string;
+  calories: number | null;
+  protein_g: number | null;
+  fat_g: number | null;
+  carbs_g: number | null;
+  sugar_g: number | null;
+  sodium_mg: number | null;
+  fiber_g: number | null;
+  nutrient_values?: Record<string, number>;
+  nutrient_source?: string;
 }
 
 function localDate() {
@@ -40,6 +80,12 @@ function AddFoodForm() {
   const searchParams = useSearchParams();
   const date = searchParams.get('date') || localDate();
   const [inputText, setInputText] = useState('');
+  const [manualQuery, setManualQuery] = useState('');
+  const [manualFoods, setManualFoods] = useState<ManualFood[]>([]);
+  const [externalFoods, setExternalFoods] = useState<ExternalFood[]>([]);
+  const [manualLoading, setManualLoading] = useState(false);
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [parsedFood, setParsedFood] = useState<ParsedFood | null>(null);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -47,29 +93,127 @@ function AddFoodForm() {
 
   async function analyzeFood(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!inputText.trim() || parsing) return;
+    if ((!inputText.trim() && !selectedImage) || parsing) return;
+    if (selectedImage && (!['image/jpeg', 'image/png', 'image/webp'].includes(selectedImage.type) || selectedImage.size > 3 * 1024 * 1024)) {
+      setError('Choose a JPEG, PNG, or WebP photo under 3 MB.');
+      return;
+    }
     setParsing(true);
     setError('');
     setParsedFood(null);
 
     try {
+      let imageBase64: string | null = null;
+      if (selectedImage) {
+        const bytes = new Uint8Array(await selectedImage.arrayBuffer());
+        let binary = '';
+        for (let index = 0; index < bytes.length; index += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+        }
+        imageBase64 = btoa(binary);
+      }
       const res = await fetch('/api/ai/parse-food', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'text',
-          content: 'This is my complete food log. Read Hindi, Hinglish, or English, understand the portions, and estimate nutrition for ALL items together. Keep the description faithful to what I wrote. Food log: ' + inputText.trim(),
+          type: selectedImage ? 'image' : 'text',
+          content: imageBase64 || ('This is my complete food log. Read Hindi, Hinglish, or English, understand the portions, and estimate nutrition for ALL items together. Keep the description faithful to what I wrote. Food log: ' + inputText.trim()),
+          mediaType: selectedImage?.type,
+          context: inputText.trim() || 'Identify the visible food, estimate the portion conservatively, and clearly state uncertainty.',
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Nutrition extraction failed');
       if (!data.food || !data.food.description) throw new Error('AI did not return a food description. Try adding clearer quantities.');
       setParsedFood(data.food as ParsedFood);
+      setSelectedQuantity(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not process food. Please try again.');
     } finally {
       setParsing(false);
     }
+  }
+
+  async function searchManualFoods(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = manualQuery.trim();
+    if (!query || manualLoading) return;
+
+    setManualLoading(true);
+    setError('');
+    setManualFoods([]);
+    setExternalFoods([]);
+    try {
+      const [savedResponse, databaseResponse] = await Promise.all([
+        fetch('/api/my-foods?q=' + encodeURIComponent(query), { cache: 'no-store' }),
+        fetch('/api/food/search?q=' + encodeURIComponent(query) + '&limit=8', { cache: 'no-store' }),
+      ]);
+      const savedBody = await savedResponse.json().catch(() => ({}));
+      const databaseBody = await databaseResponse.json().catch(() => ({}));
+      if (!savedResponse.ok && !databaseResponse.ok) {
+        throw new Error(savedBody.error || databaseBody.error || 'Food search is unavailable.');
+      }
+      setManualFoods(savedResponse.ok ? (savedBody.foods || []) as ManualFood[] : []);
+      setExternalFoods(databaseResponse.ok ? (databaseBody.results || []) as ExternalFood[] : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not search foods.');
+    } finally {
+      setManualLoading(false);
+    }
+  }
+
+  function selectSavedFood(food: ManualFood) {
+    setParsedFood({
+      description: food.description,
+      brand_name: food.brand_name,
+      default_serving_size: food.default_serving_size,
+      default_serving_unit: food.default_serving_unit,
+      energy_kcal: food.energy_kcal,
+      protein_g: food.protein_g,
+      fat_g: food.fat_g,
+      saturated_fat_g: null,
+      carbs_g: food.carbs_g,
+      fiber_g: food.fiber_g,
+      sugar_g: food.sugar_g,
+      sodium_mg: food.sodium_mg,
+      cholesterol_mg: null,
+      nutrient_values: food.nutrient_values,
+      nutrient_source: food.nutrient_source || 'Saved food record',
+      food_id: food.id,
+      source: food.source || 'manual',
+    });
+    setSelectedQuantity(1);
+    setInputText('');
+    setSelectedImage(null);
+    setError('');
+  }
+
+  function selectDatabaseFood(food: ExternalFood) {
+    setParsedFood({
+      description: food.description,
+      brand_name: food.brand || null,
+      default_serving_size: food.serving_size,
+      default_serving_unit: food.serving_unit || 'serving',
+      energy_kcal: food.calories,
+      protein_g: food.protein_g,
+      fat_g: food.fat_g,
+      saturated_fat_g: null,
+      carbs_g: food.carbs_g,
+      fiber_g: food.fiber_g,
+      sugar_g: food.sugar_g,
+      sodium_mg: food.sodium_mg,
+      cholesterol_mg: null,
+      nutrient_values: food.nutrient_values || null,
+      nutrient_source: food.nutrient_source || ('USDA FoodData Central (' + food.data_type + ')'),
+      food_id: null,
+      fdc_id: food.fdc_id,
+      source: 'usda_fdc',
+      data_type: food.data_type || 'FoodData Central',
+    });
+    setSelectedQuantity(1);
+    setInputText('');
+    setSelectedImage(null);
+    setError('');
   }
 
   async function saveToDiary() {
@@ -84,13 +228,14 @@ function AddFoodForm() {
         body: JSON.stringify({
           date,
           meal: 'Food Log',
-          quantity: 1,
+          quantity: selectedQuantity,
           food: {
-            food_id: null,
+            food_id: parsedFood.food_id || null,
+            fdc_id: parsedFood.fdc_id ?? null,
             description: parsedFood.description,
-            source: 'ai-log',
+            source: parsedFood.source || 'ai-log',
             serving_size: parsedFood.default_serving_size || 1,
-            serving_unit: parsedFood.default_serving_unit || 'log',
+            serving_unit: parsedFood.default_serving_unit || 'serving',
             calories: parsedFood.energy_kcal,
             protein_g: parsedFood.protein_g,
             fat_g: parsedFood.fat_g,
@@ -130,7 +275,52 @@ function AddFoodForm() {
       </button>
 
       <h1 className="text-2xl font-bold text-gray-900">Log Food</h1>
-      <p className="text-sm text-gray-500 mt-1 mb-5">Jo khaya, apni language mein likho. Gemini calories aur nutrients estimate karega.</p>
+      <p className="text-sm text-gray-500 mt-1 mb-5">Food ki photo upload karo ya apni language mein likho. Gemini estimate dega; save karne se pehle aap review karoge.</p>
+
+      <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <BookOpen size={19} className="text-brand-700" />
+          <h2 className="font-semibold text-gray-900">Manual food search</h2>
+        </div>
+        <p className="mt-1 text-xs text-gray-500">Search your saved foods and the USDA food-composition database. No AI call is needed.</p>
+        <form onSubmit={searchManualFoods} className="mt-3 flex gap-2">
+          <input
+            value={manualQuery}
+            onChange={(event) => setManualQuery(event.target.value)}
+            placeholder="e.g. paneer, oats, milk"
+            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-3 text-base text-gray-900"
+          />
+          <button type="submit" disabled={manualLoading || !manualQuery.trim()} className="flex min-h-[48px] items-center gap-2 rounded-lg bg-brand-600 px-4 font-semibold text-white disabled:opacity-50">
+            {manualLoading ? <Loader2 size={17} className="animate-spin" /> : <Search size={17} />}
+            Search
+          </button>
+        </form>
+        {(manualFoods.length > 0 || externalFoods.length > 0) && (
+          <div className="mt-4 space-y-4">
+            {manualFoods.length > 0 && <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Your food library</h3>
+              <div className="space-y-2">
+                {manualFoods.map((food) => <button key={food.id} type="button" onClick={() => selectSavedFood(food)} className="block w-full rounded-xl border border-gray-100 bg-gray-50 p-3 text-left active:bg-brand-50">
+                  <span className="block font-semibold text-gray-900">{food.description}</span>
+                  <span className="mt-1 block text-xs text-gray-500">{food.default_serving_size ?? 'Serving'} {food.default_serving_unit || ''} · {food.energy_kcal == null ? 'Energy unavailable' : food.energy_kcal + ' kcal'} · {food.nutrient_source || food.source || 'User food'}</span>
+                </button>)}
+              </div>
+            </div>}
+            {externalFoods.length > 0 && <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">USDA FoodData Central</h3>
+              <div className="space-y-2">
+                {externalFoods.map((food) => <button key={food.fdc_id} type="button" onClick={() => selectDatabaseFood(food)} className="block w-full rounded-xl border border-gray-100 bg-gray-50 p-3 text-left active:bg-brand-50">
+                  <span className="block font-semibold text-gray-900">{food.description}</span>
+                  <span className="mt-1 block text-xs text-gray-500">{food.brand || food.data_type} · {food.serving_size ?? 'Serving size not supplied'} {food.serving_unit || ''} · {food.calories == null ? 'Energy unavailable' : food.calories + ' kcal'}</span>
+                </button>)}
+              </div>
+            </div>}
+            <p className="text-[11px] text-gray-500">Choose a food to review its known nutrient values and portion before saving it to your diary.</p>
+          </div>
+        )}
+        {!manualLoading && manualQuery.trim() && manualFoods.length === 0 && externalFoods.length === 0 && <p className="mt-3 text-sm text-gray-500">No search results found. Try another name or add a custom food in your Food Library.</p>}
+        <a href="/my-foods/add" className="mt-3 inline-flex text-sm font-semibold text-brand-700 underline">Create a custom food</a>
+      </section>
 
       <form onSubmit={analyzeFood}>
         <label htmlFor="food-log-input" className="block text-sm font-semibold text-gray-800 mb-2">
@@ -146,7 +336,15 @@ function AddFoodForm() {
           autoFocus
           className="w-full resize-y rounded-xl border-2 border-gray-300 bg-white px-4 py-3 text-base leading-6 text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
         />
-        <p className="text-xs text-gray-400 mt-1 mb-4">Quantity likhne se estimate behtar hoga. Example: “100g poha with peanuts”</p>
+        <p className="text-xs text-gray-400 mt-1 mb-4">Quantity likhne se estimate behtar ho sakta hai. Example: “100g poha with peanuts”</p>
+        <div className="mb-5 rounded-xl border border-dashed border-brand-300 bg-brand-50/60 p-4">
+          <label htmlFor="food-photo" className="flex cursor-pointer items-center gap-2 font-semibold text-brand-700">
+            <Camera size={20} /> Add food photo
+          </label>
+          <input id="food-photo" type="file" accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-sm text-gray-600" onChange={(event) => { const file = event.target.files?.[0] || null; setSelectedImage(file); setParsedFood(null); setError(''); }} />
+          <p className="mt-1 text-xs text-gray-500">JPEG, PNG or WebP, maximum 3 MB. The photo is sent for analysis and is not saved to an image library.</p>
+          {selectedImage && <div className="mt-2 flex items-center justify-between text-sm text-gray-700"><span className="truncate">{selectedImage.name}</span><button type="button" aria-label="Remove photo" onClick={() => setSelectedImage(null)} className="ml-2 rounded-lg p-2 text-gray-500"><X size={16} /></button></div>}
+        </div>
 
         <div className="mb-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Try an example</p>
@@ -162,8 +360,8 @@ function AddFoodForm() {
         )}
 
         {!parsedFood && (
-          <button type="submit" disabled={parsing || !inputText.trim()} className="w-full flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-4 text-lg font-semibold text-white active:bg-brand-800 disabled:opacity-50 min-h-[54px]">
-            {parsing ? <><Loader2 size={20} className="animate-spin" /> Processing food...</> : <><Sparkles size={20} /> Extract Nutrition</>}
+          <button type="submit" disabled={parsing || (!inputText.trim() && !selectedImage)} className="w-full flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-4 text-lg font-semibold text-white active:bg-brand-800 disabled:opacity-50 min-h-[54px]">
+            {parsing ? <><Loader2 size={20} className="animate-spin" /> Processing food...</> : <><Sparkles size={20} /> Analyse Food</>}
           </button>
         )}
       </form>
@@ -176,6 +374,7 @@ function AddFoodForm() {
               <h2 className="font-semibold">Nutrition estimate ready</h2>
             </div>
             <p className="mt-2 font-semibold text-gray-900">{parsedFood.description}</p>
+            {parsedFood.source === 'usda_fdc' && <p className="mt-1 text-xs text-gray-500">FoodData Central result. Check the returned serving size and values before logging.</p>}
             <p className="mt-1 text-xs text-gray-500">AI estimates hain. Save karne se pehle quantity/values check kar lo.</p>
           </div>
 
@@ -221,7 +420,12 @@ function AddFoodForm() {
               </div>
               {parsedFood.nutrient_source && <p className="mt-2 text-[11px] text-gray-400">Source: {parsedFood.nutrient_source}</p>}
             </section>
-            <p className="text-xs text-gray-500">Serving represented by this log: {parsedFood.default_serving_size || 1} {parsedFood.default_serving_unit || 'log'}</p>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <label className="block text-sm font-semibold text-gray-800">Portions to log
+                <input type="number" min="0.25" max="1000" step="0.25" value={selectedQuantity} onChange={(event) => setSelectedQuantity(Math.max(0.25, Math.min(1000, Number(event.target.value) || 0.25)))} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-3 text-base text-gray-900" />
+              </label>
+              <p className="mt-1 text-xs text-gray-500">Reference portion: {parsedFood.default_serving_size || 1} {parsedFood.default_serving_unit || 'serving'}. Nutrients scale by the portion count entered.</p>
+            </div>
           </div>
 
           <div className="space-y-2 p-4">

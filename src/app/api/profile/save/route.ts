@@ -1,126 +1,81 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getDefaultNutrientTargets, NUTRIENT_SPECS } from '@/lib/nutrients';
+import { validIsoDate } from '@/lib/nutrition-calculator';
+import { ageFromDateOfBirth } from '@/lib/nutrition-calculator';
 
-// Map snake_case request fields to camelCase schema field names
-const snakeToCamelMap: Record<string, string> = {
-  date_of_birth: 'dateOfBirth',
-  height_ft: 'heightFt',
-  height_in: 'heightIn',
-  starting_weight_lbs: 'startingWeightLbs',
-  current_weight_lbs: 'currentWeightLbs',
-  goal_weight_lbs: 'goalWeightLbs',
-  goal_target_date: 'goalTargetDate',
-  activity_level: 'activityLevel',
-  weekly_goal: 'weeklyGoal',
-  daily_calorie_goal: 'dailyCalorieGoal',
-  daily_step_goal: 'dailyStepGoal',
-  goal_water_oz: 'goalWaterOz',
-  goal_protein_g: 'goalProteinG',
-  goal_carbs_g: 'goalCarbsG',
-  goal_fat_g: 'goalFatG',
-  goal_fiber_g: 'goalFiberG',
-  goal_sodium_mg: 'goalSodiumMg',
-  goal_sugar_g: 'goalSugarG',
-  unit_system: 'unitSystem',
-  meal_names: 'mealNames',
-  notes: 'notes',
-  sex: 'sex',
+const fields: Record<string, string> = {
+  date_of_birth: 'dateOfBirth', height_ft: 'heightFt', height_in: 'heightIn',
+  starting_weight_lbs: 'startingWeightLbs', current_weight_lbs: 'currentWeightLbs',
+  goal_weight_lbs: 'goalWeightLbs', goal_target_date: 'goalTargetDate',
+  activity_level: 'activityLevel', weekly_goal: 'weeklyGoal',
+  daily_calorie_goal: 'dailyCalorieGoal', daily_step_goal: 'dailyStepGoal',
+  goal_water_oz: 'goalWaterOz', goal_protein_g: 'goalProteinG', goal_carbs_g: 'goalCarbsG',
+  goal_fat_g: 'goalFatG', goal_fiber_g: 'goalFiberG', goal_sodium_mg: 'goalSodiumMg',
+  goal_sugar_g: 'goalSugarG', unit_system: 'unitSystem', meal_names: 'mealNames',
+  notes: 'notes', sex: 'sex',
 };
-
-function mapSnakeToCamel(data: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [snakeKey, value] of Object.entries(data)) {
-    const camelKey = snakeToCamelMap[snakeKey];
-    if (camelKey) {
-      result[camelKey] = value;
-    }
-  }
-  return result;
+function toCamel(data: Record<string, unknown>) {
+  return Object.fromEntries(Object.entries(data).flatMap(([key, value]) => fields[key] ? [[fields[key], value]] : []));
 }
-
-function camelToSnake(obj: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  const reverseMap = Object.fromEntries(
-    Object.entries(snakeToCamelMap).map(([snake, camel]) => [camel, snake]),
-  );
-
-  for (const [key, value] of Object.entries(obj)) {
-    const snakeKey = reverseMap[key] || key;
-    result[snakeKey] = value;
-  }
-  return result;
+function toSnake(data: Record<string, unknown>) {
+  const reverse = Object.fromEntries(Object.entries(fields).map(([snake, camel]) => [camel, snake]));
+  return Object.fromEntries(Object.entries(data).map(([key, value]) => [reverse[key] || key, value]));
+}
+function ageFromDob(value: unknown): number | null {
+  return typeof value === 'string' ? ageFromDateOfBirth(value) : null;
 }
 
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   try {
-    const body = await request.json();
+    const body = await request.json() as Record<string, unknown>;
     const { profileId, ...data } = body;
-
-    // Convert snake_case to camelCase for schema
-    const camelCaseData = mapSnakeToCamel(data);
-
-    let profile: Record<string, unknown>;
-
-    if (profileId) {
-      // Update existing profile
-      profile = await db
-        .update(schema.healthProfiles)
-        .set(camelCaseData)
-        .where(eq(schema.healthProfiles.id, profileId))
-        .returning()
-        .get();
-    } else {
-      // Create new profile
-      profile = await db
-        .insert(schema.healthProfiles)
-        .values({
-          userId: session.user.id,
-          ...camelCaseData,
-        })
-        .returning()
-        .get();
+    const update = toCamel(data);
+    if (update.dateOfBirth !== undefined && (typeof update.dateOfBirth !== 'string' || !validIsoDate(update.dateOfBirth))) {
+      return NextResponse.json({ error: 'Date of birth must be a valid calendar date in YYYY-MM-DD format.' }, { status: 400 });
     }
-
-    const savedProfile = await db.select().from(schema.healthProfiles)
+    const existing = await db.select().from(schema.healthProfiles)
       .where(eq(schema.healthProfiles.userId, session.user.id)).get();
-    const previousTargets = await db.select().from(schema.nutrientTargets)
-      .where(eq(schema.nutrientTargets.userId, session.user.id)).get();
-    const defaultTargets = getDefaultNutrientTargets(savedProfile);
-    const storedTargets = previousTargets?.targets && typeof previousTargets.targets === 'object' && !Array.isArray(previousTargets.targets)
-      ? previousTargets.targets as Record<string, unknown>
-      : {};
-    const targets = Object.fromEntries(NUTRIENT_SPECS.map((spec) => {
-      const value = storedTargets[spec.key];
-      return [spec.key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaultTargets[spec.key]];
-    })) as ReturnType<typeof getDefaultNutrientTargets>;
-    if (savedProfile) {
-      targets.calories = savedProfile.dailyCalorieGoal ?? targets.calories;
-      targets.protein = savedProfile.goalProteinG ?? targets.protein;
-      targets.carbs = savedProfile.goalCarbsG ?? targets.carbs;
-      targets.fat = savedProfile.goalFatG ?? targets.fat;
-      targets.fiber = savedProfile.goalFiberG ?? targets.fiber;
-    }
-    if (previousTargets) {
-      await db.update(schema.nutrientTargets).set({ targets, updatedAt: new Date().toISOString() })
-        .where(eq(schema.nutrientTargets.userId, session.user.id)).run();
-    } else {
-      await db.insert(schema.nutrientTargets).values({ userId: session.user.id, targets }).run();
+    if (profileId && (!existing || existing.id !== profileId)) {
+      return NextResponse.json({ error: 'Profile not found.' }, { status: 404 });
     }
 
-    // Convert response back to snake_case
-    const snakeCaseProfile = camelToSnake(profile);
+    const age = ageFromDob(typeof update.dateOfBirth === 'string' ? update.dateOfBirth : existing?.dateOfBirth);
+    if (age === null || age < 18) {
+      delete update.startingWeightLbs;
+      delete update.currentWeightLbs;
+      delete update.goalWeightLbs;
+      delete update.goalTargetDate;
+      delete update.weeklyGoal;
+      delete update.dailyCalorieGoal;
+    }
 
-    return NextResponse.json({ profile: snakeCaseProfile });
-  } catch (err) {
-    return NextResponse.json(
-      { error: `Server error: ${err instanceof Error ? err.message : 'Unknown'}` },
-      { status: 500 },
-    );
+    const profile = existing
+      ? await db.update(schema.healthProfiles).set(update)
+          .where(and(eq(schema.healthProfiles.id, existing.id), eq(schema.healthProfiles.userId, session.user.id)))
+          .returning().get()
+      : await db.insert(schema.healthProfiles).values({ userId: session.user.id, ...update }).returning().get();
+
+    const saved = await db.select().from(schema.healthProfiles)
+      .where(eq(schema.healthProfiles.userId, session.user.id)).get();
+    const previous = await db.select({ id: schema.nutrientTargets.id })
+      .from(schema.nutrientTargets).where(eq(schema.nutrientTargets.userId, session.user.id)).get();
+
+    // Nutrient targets are owned by /api/nutrients. Profile saves must not
+    // overwrite an explicitly unset target with legacy profile form defaults.
+    if (!previous) {
+      await db.insert(schema.nutrientTargets).values({
+        userId: session.user.id,
+        targets: getDefaultNutrientTargets(saved),
+      }).run();
+    }
+
+    return NextResponse.json({ profile: toSnake(profile as unknown as Record<string, unknown>) });
+  } catch {
+    return NextResponse.json({ error: 'Could not save profile changes.' }, { status: 500 });
   }
 }

@@ -1,70 +1,60 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
-import { eq, and, sum } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
+import { isUnder18OrUnknown, validIsoDate } from '@/lib/nutrition-calculator';
+
+export const dynamic = 'force-dynamic';
+
 
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  // Accept date from client (local timezone) — don't calculate server-side (UTC)
-  const { searchParams } = new URL(request.url);
-  const clientDate = searchParams.get('date');
-
-  // Use client-provided date (local timezone) or fall back to server date
   const now = new Date();
-  const serverToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const today = clientDate || serverToday;
+  const fallback = [now.getFullYear(), String(now.getMonth()+1).padStart(2,'0'), String(now.getDate()).padStart(2,'0')].join('-');
+  const today = new URL(request.url).searchParams.get('date') || fallback;
+  if (!validIsoDate(today)) return NextResponse.json({ error: 'date must be YYYY-MM-DD.' }, { status: 400 });
 
-  // Get profile
-  const profile = await db
-    .select({
+  try {
+    const profile = await db.select({
+      date_of_birth: schema.healthProfiles.dateOfBirth,
       daily_calorie_goal: schema.healthProfiles.dailyCalorieGoal,
       goal_protein_g: schema.healthProfiles.goalProteinG,
       goal_carbs_g: schema.healthProfiles.goalCarbsG,
       goal_fat_g: schema.healthProfiles.goalFatG,
-      current_weight_lbs: schema.healthProfiles.currentWeightLbs,
-      goal_weight_lbs: schema.healthProfiles.goalWeightLbs,
-    })
-    .from(schema.healthProfiles)
-    .where(eq(schema.healthProfiles.userId, session.user.id))
-    .get();
+    }).from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();
 
-  // Get totals for the day
-  const totalsResult = await db
-    .select({
-      calories: sum(schema.diaryEntries.totalCalories),
-      protein: sum(schema.diaryEntries.totalProteinG),
-      carbs: sum(schema.diaryEntries.totalCarbsG),
-      fat: sum(schema.diaryEntries.totalFatG),
-    })
-    .from(schema.diaryEntries)
-    .where(
-      and(
-        eq(schema.diaryEntries.userId, session.user.id),
-        eq(schema.diaryEntries.date, today),
-        eq(schema.diaryEntries.type, 'diary_meal'),
-      ),
-    )
-    .get();
+    const totalsResult = await db.select({
+      calories: sql<number | null>`CASE WHEN COUNT(*) = 0 THEN 0 WHEN COUNT(${schema.diaryEntries.totalCalories}) = COUNT(*) THEN SUM(${schema.diaryEntries.totalCalories}) ELSE NULL END`,
+      protein: sql<number | null>`CASE WHEN COUNT(*) = 0 THEN 0 WHEN COUNT(${schema.diaryEntries.totalProteinG}) = COUNT(*) THEN SUM(${schema.diaryEntries.totalProteinG}) ELSE NULL END`,
+      carbs: sql<number | null>`CASE WHEN COUNT(*) = 0 THEN 0 WHEN COUNT(${schema.diaryEntries.totalCarbsG}) = COUNT(*) THEN SUM(${schema.diaryEntries.totalCarbsG}) ELSE NULL END`,
+      fat: sql<number | null>`CASE WHEN COUNT(*) = 0 THEN 0 WHEN COUNT(${schema.diaryEntries.totalFatG}) = COUNT(*) THEN SUM(${schema.diaryEntries.totalFatG}) ELSE NULL END`,
+      mealsLogged: sql<number>`COUNT(*)`,
+    }).from(schema.diaryEntries).where(and(
+      eq(schema.diaryEntries.userId, session.user.id),
+      eq(schema.diaryEntries.date, today),
+      eq(schema.diaryEntries.type, 'diary_meal'),
+    )).get();
 
-  const totals = {
-    calories: Number(totalsResult?.calories || 0),
-    protein: Number(totalsResult?.protein || 0),
-    carbs: Number(totalsResult?.carbs || 0),
-    fat: Number(totalsResult?.fat || 0),
-  };
-
-  const response = NextResponse.json({
-    user: {
-      first_name: session.user.first_name,
-      last_name: session.user.last_name,
-    },
-    profile,
-    totals,
-    hasProfile: !!profile,
-  });
-  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-  response.headers.set('Pragma', 'no-cache');
-  return response;
+    const isMinor = isUnder18OrUnknown(profile?.date_of_birth);
+    const response = NextResponse.json({
+      user: { first_name: session.user.first_name, last_name: session.user.last_name },
+      profile: profile ? {
+        ...profile,
+        daily_calorie_goal: isMinor ? null : profile.daily_calorie_goal,
+      } : null,
+      totals: {
+        calories: totalsResult?.calories ?? (totalsResult?.mealsLogged ? null : 0),
+        protein: totalsResult?.protein ?? (totalsResult?.mealsLogged ? null : 0),
+        carbs: totalsResult?.carbs ?? (totalsResult?.mealsLogged ? null : 0),
+        fat: totalsResult?.fat ?? (totalsResult?.mealsLogged ? null : 0),
+      },
+      hasProfile: !!profile,
+      isMinor,
+    }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
+    response.headers.set('Pragma', 'no-cache');
+    return response;
+  } catch {
+    return NextResponse.json({ error: 'Could not load dashboard data.' }, { status: 500 });
+  }
 }

@@ -1,16 +1,17 @@
 {
-  "name": "health-app-scaffold",
+  "name": "mynutri",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "tsx src/lib/db/migrate.ts && next start",
+    "start": "tsx src/lib/db/migrate.ts && node .next/standalone/server.js",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "tsx src/lib/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
-    "postinstall": "npm run build"
+    "postinstall": "npm run build",
+    "test": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
@@ -36,7 +37,8 @@
     "@types/node": "^20",
     "@types/pg": "^8.15.5",
     "@types/react": "^19",
-    "@types/react-dom": "^19"
+    "@types/react-dom": "^19",
+    "@google/genai": "^2.32.0"
   },
   "devDependencies": {
     "eslint": "^9",

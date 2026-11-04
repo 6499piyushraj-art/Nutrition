@@ -1,4 +1,4 @@
-name: Tally Neon build verification
+name: MyNutri build verification
 
 on:
   push:
@@ -25,6 +25,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm install --ignore-scripts
+      - name: Unit tests
+        run: npm test
       - name: Production build
         run: npm run build
       - name: Type-check

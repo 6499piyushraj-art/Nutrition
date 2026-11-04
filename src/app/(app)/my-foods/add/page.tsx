@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, lazy, Suspense } from 'react';
+import { useState, useRef, lazy, Suspense, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Search, Keyboard, ScanBarcode, Sparkles, Camera, Image, ClipboardPaste, MessageSquare, RotateCcw } from 'lucide-react';
 import TagPicker from '@/components/food/TagPicker';
@@ -9,6 +9,25 @@ import type { StrippedFood } from '@/lib/usda';
 const BarcodeScanner = lazy(() => import('@/components/food/BarcodeScanner'));
 
 type AddMode = 'choose' | 'manual' | 'usda' | 'barcode' | 'barcode-scan' | 'ai-choose' | 'ai-text' | 'ai-describe' | 'ai-photo-preview' | 'ai-photo';
+
+interface SavedFood {
+  id: string;
+  description: string;
+  brand_name: string | null;
+  source: string | null;
+  fdc_id: number | null;
+  default_serving_size: number | null;
+  default_serving_unit: string | null;
+  energy_kcal: number | null;
+  protein_g: number | null;
+  fat_g: number | null;
+  carbs_g: number | null;
+  fiber_g: number | null;
+  sugar_g: number | null;
+  sodium_mg: number | null;
+  nutrient_values: Record<string, number> | null;
+  nutrient_source: string | null;
+}
 
 interface ParsedFood {
   description: string;
@@ -32,6 +51,10 @@ export default function AddFoodPage() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<AddMode>('choose');
+  const [logDate, setLogDate] = useState<string | null>(null);
+  const [logMeal, setLogMeal] = useState('Snacks');
+  const [logQuantity, setLogQuantity] = useState('1');
+  const [createdFood, setCreatedFood] = useState<SavedFood | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -74,14 +97,26 @@ export default function AddFoodPage() {
     cholesterol_mg: '',
   });
   const [formTags, setFormTags] = useState<string[]>([]);
+  const [foodFdcId, setFoodFdcId] = useState<number | null>(null);
+  const [foodSource, setFoodSource] = useState('manual');
   const [nutrientValues, setNutrientValues] = useState<Record<string, number> | null>(null);
   const [nutrientSource, setNutrientSource] = useState<string | null>(null);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const date = params.get('logDate');
+    if (date && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(date)) setLogDate(date);
+  }, []);
+
   function updateForm(field: string, value: string) {
+    setCreatedFood(null);
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
   function populateFromParsed(food: ParsedFood) {
+    setCreatedFood(null);
+    setFoodFdcId(null);
+    setFoodSource('ai-log');
     setNutrientValues(null);
     setNutrientSource(null);
     setFormTags([]); // AI no longer suggests tags — user picks their own
@@ -105,12 +140,15 @@ export default function AddFoodPage() {
   }
 
   function populateFromUSDA(food: StrippedFood) {
+    setCreatedFood(null);
+    setFoodFdcId(food.fdc_id > 0 ? food.fdc_id : null);
+    setFoodSource(food.data_type === 'OpenFoodFacts' ? 'open_food_facts' : 'usda_fdc');
     setForm({
       description: food.description,
       brand_name: food.brand,
       barcode: food.upc,
-      default_serving_size: food.serving_size?.toString() || '',
-      default_serving_unit: food.serving_unit || 'g',
+      default_serving_size: food.serving_size?.toString() || (food.data_type === 'Branded' ? '1' : '100'),
+      default_serving_unit: food.serving_unit || (food.data_type === 'Branded' ? 'serving' : 'g'),
       energy_kcal: food.calories?.toString() || '',
       protein_g: food.protein_g?.toString() || '',
       fat_g: food.fat_g?.toString() || '',
@@ -290,42 +328,93 @@ export default function AddFoodPage() {
       setError('Food name is required');
       return;
     }
+    const multiplier = Number(logQuantity);
+    if (logDate && (!Number.isFinite(multiplier) || multiplier <= 0 || multiplier > 10000)) {
+      setError('Enter a serving quantity greater than zero.');
+      return;
+    }
+
     setSaving(true);
     setError('');
     try {
-      const res = await fetch('/api/my-foods/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: form.description.trim(),
-          brand_name: form.brand_name.trim() || null,
-          barcode: form.barcode.trim() || null,
-          default_serving_size: form.default_serving_size ? parseFloat(form.default_serving_size) : null,
-          default_serving_unit: form.default_serving_unit || null,
-          energy_kcal: form.energy_kcal ? parseFloat(form.energy_kcal) : null,
-          protein_g: form.protein_g ? parseFloat(form.protein_g) : null,
-          fat_g: form.fat_g ? parseFloat(form.fat_g) : null,
-          saturated_fat_g: form.saturated_fat_g ? parseFloat(form.saturated_fat_g) : null,
-          carbs_g: form.carbs_g ? parseFloat(form.carbs_g) : null,
-          fiber_g: form.fiber_g ? parseFloat(form.fiber_g) : null,
-          sugar_g: form.sugar_g ? parseFloat(form.sugar_g) : null,
-          sodium_mg: form.sodium_mg ? parseFloat(form.sodium_mg) : null,
-          cholesterol_mg: form.cholesterol_mg ? parseFloat(form.cholesterol_mg) : null,
-          nutrient_values: nutrientValues,
-          nutrient_source: nutrientSource,
-          tag_ids: formTags,
-          source: nutrientValues ? 'usda_fdc' : form.barcode ? 'usda' : 'manual',
-        }),
-      });
-      if (!res.ok) {
+      let savedFood = createdFood;
+      if (!savedFood) {
+        const res = await fetch('/api/my-foods/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            description: form.description.trim(),
+            brand_name: form.brand_name.trim() || null,
+            upc_code: form.barcode.trim() || null,
+            fdc_id: foodFdcId,
+            default_serving_size: form.default_serving_size ? parseFloat(form.default_serving_size) : null,
+            default_serving_unit: form.default_serving_unit || null,
+            energy_kcal: form.energy_kcal ? parseFloat(form.energy_kcal) : null,
+            protein_g: form.protein_g ? parseFloat(form.protein_g) : null,
+            fat_g: form.fat_g ? parseFloat(form.fat_g) : null,
+            saturated_fat_g: form.saturated_fat_g ? parseFloat(form.saturated_fat_g) : null,
+            carbs_g: form.carbs_g ? parseFloat(form.carbs_g) : null,
+            fiber_g: form.fiber_g ? parseFloat(form.fiber_g) : null,
+            sugar_g: form.sugar_g ? parseFloat(form.sugar_g) : null,
+            sodium_mg: form.sodium_mg ? parseFloat(form.sodium_mg) : null,
+            cholesterol_mg: form.cholesterol_mg ? parseFloat(form.cholesterol_mg) : null,
+            nutrient_values: nutrientValues,
+            nutrient_source: nutrientSource,
+            tag_ids: formTags,
+            source: foodSource,
+          }),
+        });
         const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Failed to save');
-        setSaving(false);
+        if (!res.ok || !data.food?.id) {
+          setError(data.error || 'Food could not be saved.');
+          setSaving(false);
+          return;
+        }
+        savedFood = data.food as SavedFood;
+        setCreatedFood(savedFood);
+      }
+
+      if (logDate && savedFood) {
+        const diaryRes = await fetch('/api/diary/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: logDate,
+            meal: logMeal,
+            quantity: multiplier,
+            food: {
+              food_id: savedFood.id,
+              description: savedFood.description,
+              source: savedFood.source,
+              fdc_id: savedFood.fdc_id,
+              brand_name: savedFood.brand_name,
+              serving_size: savedFood.default_serving_size ?? 1,
+              serving_unit: savedFood.default_serving_unit ?? 'serving',
+              calories: savedFood.energy_kcal,
+              protein_g: savedFood.protein_g,
+              fat_g: savedFood.fat_g,
+              carbs_g: savedFood.carbs_g,
+              fiber_g: savedFood.fiber_g,
+              sugar_g: savedFood.sugar_g,
+              sodium_mg: savedFood.sodium_mg,
+              nutrient_values: savedFood.nutrient_values,
+              nutrient_source: savedFood.nutrient_source,
+            },
+          }),
+        });
+        const diaryData = await diaryRes.json().catch(() => ({}));
+        if (!diaryRes.ok) {
+          setError('Food was saved to My Foods, but could not be added to this diary. Press “Retry diary logging” to try again without creating another copy.');
+          setSaving(false);
+          return;
+        }
+        window.location.href = '/diary/' + logDate;
         return;
       }
+
       window.location.href = '/my-foods';
     } catch {
-      setError('Failed to save food');
+      setError('Food could not be saved. Check your connection and try again.');
       setSaving(false);
     }
   }
@@ -791,6 +880,11 @@ export default function AddFoodPage() {
   const resetForm = () => {
     setForm({ description: '', brand_name: '', barcode: '', default_serving_size: '', default_serving_unit: 'g', energy_kcal: '', protein_g: '', fat_g: '', saturated_fat_g: '', carbs_g: '', fiber_g: '', sugar_g: '', sodium_mg: '', cholesterol_mg: '' });
     setFormTags([]);
+    setCreatedFood(null);
+    setFoodFdcId(null);
+    setFoodSource('manual');
+    setNutrientValues(null);
+    setNutrientSource(null);
     setError('');
   };
 
@@ -877,6 +971,23 @@ export default function AddFoodPage() {
           </div>
         </div>
 
+        {logDate && (
+          <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-4">
+            <h2 className="font-semibold text-gray-900">Add to diary · {logDate}</h2>
+            <p className="mt-1 text-xs text-gray-600">Choose the meal and how many of the selected serving you ate. The nutrition is scaled from the saved food record.</p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <label className="block text-xs font-medium text-gray-600">Meal
+                <select value={logMeal} onChange={(event) => setLogMeal(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm text-gray-900">
+                  <option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snacks</option>
+                </select>
+              </label>
+              <label className="block text-xs font-medium text-gray-600">Serving multiplier
+                <input type="number" min="0.01" max="10000" step="any" value={logQuantity} onChange={(event) => setLogQuantity(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm text-gray-900" />
+              </label>
+            </div>
+          </div>
+        )}
+
         <TagPicker selectedIds={formTags} onChange={setFormTags} />
 
         {form.barcode && (
@@ -885,7 +996,7 @@ export default function AddFoodPage() {
 
         <button type="submit" disabled={saving}
           className="w-full bg-brand-600 text-white rounded-lg px-4 py-4 text-lg font-semibold hover:bg-brand-700 active:bg-brand-800 disabled:opacity-50 min-h-[52px]">
-          {saving ? 'Saving...' : 'Save to My Foods'}
+          {saving ? 'Saving...' : createdFood && logDate ? 'Retry diary logging' : logDate ? 'Save food and add to diary' : 'Save to My Foods'}
         </button>
       </form>
     </div>

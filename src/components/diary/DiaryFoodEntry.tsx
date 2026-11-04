@@ -10,9 +10,10 @@ interface Props {
   entry: FoodEntryData;
   diaryEntryId: string;
   date: string;
+  isMinor?: boolean;
 }
 
-export default function DiaryFoodEntry({ entry, diaryEntryId, date }: Props) {
+export default function DiaryFoodEntry({ entry, diaryEntryId, date, isMinor = true }: Props) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -26,13 +27,28 @@ export default function DiaryFoodEntry({ entry, diaryEntryId, date }: Props) {
   const brandName = entry.food?.brand_name;
   const basePerServing = entry.food;
 
-  // If the food has been deleted, show a simplified view with remove option
+  const displayQty = editing ? qty : entry.quantity;
+  const scale = (value: number | null | undefined): number | null =>
+    typeof value === 'number' && Number.isFinite(value) ? Math.round(value * qty * 10) / 10 : null;
+  const shown = (value: number | null | undefined, digits = 1): string =>
+    typeof value === 'number' && Number.isFinite(value) ? String(Math.round(value * (10 ** digits)) / (10 ** digits)) : '—';
+
+  const cal = editing && basePerServing ? scale(basePerServing.energy_kcal) : entry.energy_kcal;
+  const pro = editing && basePerServing ? scale(basePerServing.protein_g) : entry.protein_g;
+  const carb = editing && basePerServing ? scale(basePerServing.carbs_g) : entry.carbs_g;
+  const fat = editing && basePerServing ? scale(basePerServing.fat_g) : entry.fat_g;
+  const fiber = editing && basePerServing ? scale(basePerServing.fiber_g) : entry.fiber_g;
+  const sodium = editing && basePerServing ? scale(basePerServing.sodium_mg) : entry.sodium_mg;
+  const sugar = editing && basePerServing ? scale(basePerServing.sugar_g) : entry.sugar_g;
+
+  // If the food has been deleted, show a simplified view with its saved values.
   if (isDeleted) {
     return (
       <div className="px-4 py-3 flex items-center justify-between bg-red-50/50">
         <div className="flex-1">
           <p className="text-sm text-red-400 italic">Deleted food</p>
-          <p className="text-xs text-gray-400">{Math.round(entry.energy_kcal || 0)} cal &middot; {entry.quantity} serving{entry.quantity !== 1 ? 's' : ''}</p>
+          {!isMinor && <p className="text-xs text-gray-400">{shown(entry.energy_kcal, 0)} cal · {entry.quantity} serving{entry.quantity !== 1 ? 's' : ''}</p>}
+          <p className="text-xs text-gray-500">Nutrition details are unavailable because the source food was deleted.</p>
         </div>
         <button
           onClick={() => setShowDelete(true)}
@@ -52,31 +68,6 @@ export default function DiaryFoodEntry({ entry, diaryEntryId, date }: Props) {
       </div>
     );
   }
-
-  // When editing, show live-calculated values based on new qty
-  // When not editing, show the stored values
-  const displayQty = editing ? qty : entry.quantity;
-  const cal = editing && basePerServing
-    ? Math.round((basePerServing.energy_kcal || 0) * qty)
-    : Math.round(entry.energy_kcal || 0);
-  const pro = editing && basePerServing
-    ? Math.round((basePerServing.protein_g || 0) * qty * 10) / 10
-    : Math.round((entry.protein_g || 0) * 10) / 10;
-  const carb = editing && basePerServing
-    ? Math.round((basePerServing.carbs_g || 0) * qty * 10) / 10
-    : Math.round((entry.carbs_g || 0) * 10) / 10;
-  const fat = editing && basePerServing
-    ? Math.round((basePerServing.fat_g || 0) * qty * 10) / 10
-    : Math.round((entry.fat_g || 0) * 10) / 10;
-  const fiber = editing && basePerServing
-    ? Math.round((basePerServing.fat_g || 0) * qty * 10) / 10
-    : Math.round((entry.fiber_g || 0) * 10) / 10;
-  const sodium = editing && basePerServing
-    ? Math.round((basePerServing.energy_kcal || 0) * qty)
-    : Math.round(entry.sodium_mg || 0);
-  const sugar = editing && basePerServing
-    ? Math.round((basePerServing.energy_kcal || 0) * qty * 10) / 10
-    : Math.round((entry.sugar_g || 0) * 10) / 10;
 
   const servingInfo = entry.food?.default_serving_size
     ? `${entry.food.default_serving_size}${entry.food.default_serving_unit ? ` ${entry.food.default_serving_unit}` : ''}`
@@ -143,7 +134,7 @@ export default function DiaryFoodEntry({ entry, diaryEntryId, date }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-sm font-medium text-orange-600">{cal} cal</span>
+          {!isMinor && <span className="text-sm font-medium text-orange-600">{shown(cal, 0)} cal</span>}
           {expanded ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
         </div>
       </button>
@@ -192,7 +183,7 @@ export default function DiaryFoodEntry({ entry, diaryEntryId, date }: Props) {
                   </button>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-2">{cal} cal &middot; P {pro}g &middot; C {carb}g &middot; F {fat}g</p>
+              <p className="text-xs text-gray-500 mt-2">{!isMinor && <>{shown(cal, 0)} cal · </>}P {shown(pro)}g · C {shown(carb)}g · F {shown(fat)}g</p>
             </div>
           ) : null}
 
@@ -200,27 +191,27 @@ export default function DiaryFoodEntry({ entry, diaryEntryId, date }: Props) {
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="grid grid-cols-3 gap-y-2 text-sm">
               <div className="text-center">
-                <p className="font-semibold text-blue-600">{pro}g</p>
+                <p className="font-semibold text-blue-600">{shown(pro)}g</p>
                 <p className="text-[10px] text-gray-500">protein</p>
               </div>
               <div className="text-center">
-                <p className="font-semibold text-green-600">{carb}g</p>
+                <p className="font-semibold text-green-600">{shown(carb)}g</p>
                 <p className="text-[10px] text-gray-500">carbs</p>
               </div>
               <div className="text-center">
-                <p className="font-semibold text-purple-600">{fat}g</p>
+                <p className="font-semibold text-purple-600">{shown(fat)}g</p>
                 <p className="text-[10px] text-gray-500">fat</p>
               </div>
               <div className="text-center">
-                <p className="font-semibold text-gray-700">{fiber}g</p>
+                <p className="font-semibold text-gray-700">{shown(fiber)}g</p>
                 <p className="text-[10px] text-gray-500">fiber</p>
               </div>
               <div className="text-center">
-                <p className="font-semibold text-gray-700">{sugar}g</p>
+                <p className="font-semibold text-gray-700">{shown(sugar)}g</p>
                 <p className="text-[10px] text-gray-500">sugar</p>
               </div>
               <div className="text-center">
-                <p className="font-semibold text-gray-700">{sodium}mg</p>
+                <p className="font-semibold text-gray-700">{shown(sodium, 0)}mg</p>
                 <p className="text-[10px] text-gray-500">sodium</p>
               </div>
             </div>

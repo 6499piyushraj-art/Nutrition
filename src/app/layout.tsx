@@ -20,10 +20,10 @@ const bricolage = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  title: "Nutrients | Daily Nutrition",
-  description: "A warmer, simpler way to understand your food and daily nutrients.",
+  title: "MyNutri | Daily Nutrition",
+  description: "MyNutri helps you understand your food and daily nutrition with clear, source-aware estimates.",
   icons: {
-    icon: [{ url: "/nutrients-mark.svg", type: "image/svg+xml" }],
+    icon: [{ url: "/mynutri-mark.svg", type: "image/svg+xml" }],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
 };

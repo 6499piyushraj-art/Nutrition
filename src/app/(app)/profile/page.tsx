@@ -2,11 +2,13 @@ import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { db, schema } from '@/lib/db';
 import { eq, and, asc } from 'drizzle-orm';
+import { isUnder18OrUnknown } from '@/lib/nutrition-calculator';
 import ProfileForm from '@/components/profile/ProfileForm';
 import WeightChart from '@/components/profile/WeightChart';
 import TagManager from '@/components/profile/TagManager';
 import LogoutButton from '@/components/profile/LogoutButton';
 import ChangePassword from '@/components/profile/ChangePassword';
+import DeleteAccountButton from '@/components/profile/DeleteAccountButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,12 +60,23 @@ async function getWeightHistory(userId: string) {
     .all();
 }
 
+
 export default async function ProfilePage() {
   const session = await getSession();
   if (!session) redirect('/login');
 
   const profile = await getProfile(session.user.id);
-  const weightHistory = await getWeightHistory(session.user.id);
+  const isMinor = isUnder18OrUnknown(profile?.date_of_birth);
+  const profileForForm = isMinor && profile ? {
+    ...profile,
+    starting_weight_lbs: undefined,
+    current_weight_lbs: undefined,
+    goal_weight_lbs: undefined,
+    goal_target_date: undefined,
+    weekly_goal: undefined,
+    daily_calorie_goal: undefined,
+  } : profile;
+  const weightHistory = isMinor ? [] : await getWeightHistory(session.user.id);
 
   return (
     <div className="pb-8">
@@ -72,19 +85,20 @@ export default async function ProfilePage() {
       </div>
 
       {/* Weight chart */}
-      <WeightChart
+      {!isMinor && <WeightChart
         measurements={weightHistory}
         startingWeight={profile?.starting_weight_lbs ?? null}
         goalWeight={profile?.goal_weight_lbs ?? null}
         goalDate={profile?.goal_target_date ?? null}
-      />
+      />}
 
       {/* Tag management */}
       <TagManager />
 
       {/* Profile form */}
       <ProfileForm
-        profile={profile}
+        profile={profileForForm}
+        isMinor={isMinor}
         userId={session.user.id}
         userEmail={session.user.email}
         userName={`${session.user.first_name || ''} ${session.user.last_name || ''}`.trim()}
@@ -94,6 +108,9 @@ export default async function ProfilePage() {
       <div className="mt-8">
         <ChangePassword />
       </div>
+
+      {/* Account deletion */}
+      <div className="mt-4"><DeleteAccountButton /></div>
 
       {/* Logout */}
       <div className="mt-4">

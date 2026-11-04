@@ -1,0 +1,100 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { aggregateKnownValues, ageFromDateOfBirth, isUnder18OrUnknown, isVerifiedAdult, scaleNutrients, validIsoDate } from '../src/lib/nutrition-calculator';
+import { getDefaultNutrientTargets, getNutrientReferenceMetadata } from '../src/lib/nutrients';
+
+test('scales per-serving values proportionally', () => {
+  assert.deepEqual(scaleNutrients({ calories: 100, protein: 4, calcium: null }, 1.5), {
+    calories: 150, protein: 6, calcium: null,
+  });
+});
+
+test('unknown micronutrients remain unknown', () => {
+  assert.deepEqual(scaleNutrients({ vitaminB12: undefined, iron: 2 }, 2), {
+    vitaminB12: null, iron: 4,
+  });
+});
+
+test('rejects negative and non-finite portions', () => {
+  assert.throws(() => scaleNutrients({ calories: 100 }, -1), RangeError);
+  assert.throws(() => scaleNutrients({ calories: 100 }, Number.NaN), RangeError);
+});
+
+test('returns complete totals only when every food value is known', () => {
+  assert.deepEqual(aggregateKnownValues([100, 50]), {
+    value: 150, status: 'complete', knownFoods: 2, totalFoods: 2,
+  });
+});
+
+test('marks incomplete totals without silently counting null as zero', () => {
+  assert.deepEqual(aggregateKnownValues([100, null]), {
+    value: null, status: 'partial', knownFoods: 1, totalFoods: 2,
+  });
+  assert.deepEqual(aggregateKnownValues([null, undefined]), {
+    value: null, status: 'unavailable', knownFoods: 0, totalFoods: 2,
+  });
+  assert.deepEqual(aggregateKnownValues([]), {
+    value: null, status: 'no_food', knownFoods: 0, totalFoods: 0,
+  });
+});
+
+test('validates real ISO calendar dates', () => {
+  assert.equal(validIsoDate('2026-11-03'), true);
+  assert.equal(validIsoDate('2026-02-29'), false);
+  assert.equal(validIsoDate('2026-13-01'), false);
+  assert.equal(validIsoDate('03-11-2026'), false);
+});
+
+
+test('uses the ICMR-NIN 2020 16–18 reference band for girls', () => {
+  const targets = getDefaultNutrientTargets({ dateOfBirth: '2009-01-01', sex: 'F' });
+  assert.equal(targets.protein, 37.3);
+  assert.equal(targets.iron, null);
+  assert.equal(targets.zinc, null);
+  assert.equal(targets.folate, null);
+  assert.equal(targets.vitamin_c, null);
+  assert.equal(targets.vitamin_a, null);
+});
+
+test('uses the ICMR-NIN 2020 16–18 reference band for boys', () => {
+  const targets = getDefaultNutrientTargets({ dateOfBirth: '2009-01-01', sex: 'M' });
+  assert.equal(targets.protein, 45.1);
+  assert.equal(targets.iron, null);
+  assert.equal(targets.zinc, null);
+  assert.equal(targets.folate, null);
+  assert.equal(targets.vitamin_c, null);
+});
+
+test('falls back to unclassified references for invalid birth dates', () => {
+  const metadata = getNutrientReferenceMetadata({ dateOfBirth: '2009-02-30', sex: 'M' });
+  assert.equal(metadata.populationGroup, 'Age/sex-specific reference not selected');
+});
+
+
+test('classifies missing, malformed and underage birth dates conservatively', () => {
+  assert.equal(ageFromDateOfBirth('2009-01-01', new Date('2026-11-03T12:00:00Z')), 17);
+  assert.equal(ageFromDateOfBirth('2009-02-30', new Date('2026-11-03T12:00:00Z')), null);
+  assert.equal(isUnder18OrUnknown(null), true);
+  assert.equal(isUnder18OrUnknown('2009-01-01'), true);
+  assert.equal(isVerifiedAdult('2000-01-01'), true);
+  assert.equal(isVerifiedAdult('2010-01-01'), false);
+});
+
+
+test('does not invent adolescent micronutrient targets absent from the cited age band', () => {
+  const targets = getDefaultNutrientTargets({ dateOfBirth: '2009-01-01', sex: 'M' });
+  assert.equal(targets.protein, 45.1);
+  assert.equal(targets.calcium, null);
+  assert.equal(targets.magnesium, null);
+  assert.equal(targets.vitamin_e, null);
+});
+
+test('adds extended micronutrient keys without defaulting unknown targets to zero', () => {
+  const targets = getDefaultNutrientTargets({ dateOfBirth: '2000-01-01', sex: 'M' });
+  assert.equal(targets.phosphorus, null);
+  assert.equal(targets.potassium, null);
+  assert.equal(targets.chromium, null);
+  assert.equal(targets.molybdenum, null);
+  assert.equal(targets.vitamin_e, null);
+  assert.equal(targets.magnesium, 370);
+});

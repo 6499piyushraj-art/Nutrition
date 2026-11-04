@@ -21,6 +21,10 @@ export interface StrippedFood {
   nutrient_source?: string;
 }
 
+export function isValidFoodBarcode(value: string): boolean {
+  return /^(?:[0-9]{8}|[0-9]{12,14})$/.test(value);
+}
+
 export interface SearchResult {
   query: string;
   total: number;
@@ -34,6 +38,8 @@ const FDC_MICRONUTRIENT_MAP: Record<number, { key: string; factor: number }> = {
   1087: { key: 'calcium', factor: 1 }, 1089: { key: 'iron', factor: 1 },
   1095: { key: 'zinc', factor: 1 }, 1114: { key: 'vitamin_d', factor: 1 },
   1178: { key: 'b12', factor: 1 }, 1177: { key: 'folate', factor: 1 }, 1186: { key: 'folate', factor: 1 },
+  1085: { key: 'chloride', factor: 1 }, 1096: { key: 'chromium', factor: 1 },
+  1097: { key: 'fluoride', factor: 1 }, 1102: { key: 'molybdenum', factor: 1 },
   1162: { key: 'vitamin_c', factor: 1 }, 1106: { key: 'vitamin_a', factor: 1 },
   1100: { key: 'iodine', factor: 1 }, 1091: { key: 'phosphorus', factor: 1 },
   1090: { key: 'magnesium', factor: 1 }, 1092: { key: 'potassium', factor: 1 },
@@ -45,7 +51,7 @@ const FDC_MICRONUTRIENT_MAP: Record<number, { key: string; factor: number }> = {
   1176: { key: 'biotin', factor: 1 },
 };
 
-function stripFood(food: Record<string, unknown>): StrippedFood {
+export function stripFood(food: Record<string, unknown>): StrippedFood {
   const nutrients: Record<string, number> = {};
   const nutrientValues: Record<string, number> = {};
   const foodNutrients = (food.foodNutrients || []) as Record<string, unknown>[];
@@ -68,13 +74,15 @@ function stripFood(food: Record<string, unknown>): StrippedFood {
     if (/omega[- ]?6.*total|total.*omega[- ]?6/.test(name)) nutrientValues.omega6 = Math.round(grams * 10000) / 10000;
   }
   const dataType = String(food.dataType || 'FoodData Central');
+  const branded = dataType.toLowerCase() === 'branded';
+  const rawServingSize = typeof food.servingSize === 'number' && Number.isFinite(food.servingSize) && food.servingSize > 0 ? food.servingSize : null;
   return {
     fdc_id: food.fdcId as number,
     description: (food.description as string) || '',
     brand: (food.brandOwner as string) || (food.brandName as string) || '',
     upc: (food.gtinUpc as string) || '',
-    serving_size: (food.servingSize as number) || null,
-    serving_unit: (food.servingSizeUnit as string) || '',
+    serving_size: rawServingSize ?? (branded ? null : 100),
+    serving_unit: (typeof food.servingSizeUnit === 'string' && food.servingSizeUnit.trim()) || (branded ? '' : 'g'),
     data_type: (food.dataType as string) || '',
     calories: nutrients.calories ?? null,
     protein_g: nutrients.protein_g ?? null,
@@ -88,35 +96,60 @@ function stripFood(food: Record<string, unknown>): StrippedFood {
   };
 }
 
-export async function searchUSDA(query: string, limit = 10, dataTypes?: string[]): Promise<SearchResult> {
-  const types = dataTypes || ['Branded', 'Survey (FNDDS)'];
-  const safeQuery = query.trim();
-  if (!safeQuery) return { query, total: 0, results: [] };
+const INDIAN_SEARCH_ALIASES: Array<[string, string]> = [
+  ['moong dal', 'mung beans'], ['mung dal', 'mung beans'],
+  ['toor dal', 'pigeon peas'], ['arhar dal', 'pigeon peas'],
+  ['masoor dal', 'red lentils'], ['urad dal', 'black gram'],
+  ['chana dal', 'split chickpeas'], ['kabuli chana', 'chickpeas'],
+  ['moongfali', 'peanuts'], ['groundnut', 'peanuts'],
+  ['rajma', 'kidney beans'], ['chole', 'chickpeas'],
+  ['chawal', 'rice'], ['doodh', 'milk'], ['dahi', 'yogurt'],
+  ['curd', 'yogurt'], ['roti', 'whole wheat flatbread'],
+  ['chapati', 'whole wheat flatbread'], ['atta', 'whole wheat flour'],
+  ['poha', 'flattened rice'], ['upma', 'semolina'],
+  ['bhindi', 'okra'], ['baingan', 'eggplant'], ['palak', 'spinach'],
+  ['lauki', 'bottle gourd'], ['karela', 'bitter melon'],
+  ['aloo', 'potato'], ['matar', 'green peas'], ['gobi', 'cauliflower'],
+  ['kela', 'banana'], ['seb', 'apple'], ['amla', 'Indian gooseberry'],
+  ['nariyal', 'coconut'], ['badam', 'almond'], ['dal', 'lentils'],
+];
 
-  const cacheKey = JSON.stringify([safeQuery.toLowerCase(), Math.min(limit, 25), types]);
+export function normalizeIndianFoodQuery(query: string): string {
+  let value = query.trim();
+  for (const [source, replacement] of INDIAN_SEARCH_ALIASES) {
+    // Alias entries contain plain words/spaces, so no regular-expression escaping is needed.
+    const expression = new RegExp('\\b' + source + '\\b', 'gi');
+    value = value.replace(expression, replacement);
+  }
+  return value;
+}
+
+export async function searchUSDA(query: string, limit = 10, dataTypes?: string[]): Promise<SearchResult> {
+  const types = dataTypes || ['Foundation', 'SR Legacy', 'Survey (FNDDS)', 'Branded'];
+  const originalQuery = query.trim();
+  const safeQuery = normalizeIndianFoodQuery(originalQuery);
+  if (!safeQuery) return { query: originalQuery, total: 0, results: [] };
+  const safeLimit = Math.max(1, Math.min(Number.isFinite(limit) ? Math.floor(limit) : 10, 25));
+
+  const cacheKey = JSON.stringify([safeQuery.toLowerCase(), safeLimit, types]);
   const cached = SEARCH_CACHE.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.result;
+  if (cached && cached.expiresAt > Date.now()) {
+    return { ...cached.result, query: originalQuery };
+  }
   if (cached) SEARCH_CACHE.delete(cacheKey);
 
   const res = await fetch(`${USDA_BASE_URL}/foods/search?api_key=${encodeURIComponent(USDA_API_KEY)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query: safeQuery,
-      pageSize: Math.min(limit, 25),
-      dataType: types,
-    }),
+    body: JSON.stringify({ query: safeQuery, pageSize: safeLimit, dataType: types }),
     signal: AbortSignal.timeout(5000),
   });
-
-  if (!res.ok) {
-    throw new Error(`USDA API error: ${res.status}`);
-  }
+  if (!res.ok) throw new Error(`USDA API error: ${res.status}`);
 
   const data = await res.json();
   const result: SearchResult = {
-    query: safeQuery,
-    total: data.totalHits || 0,
+    query: originalQuery,
+    total: typeof data.totalHits === 'number' ? data.totalHits : 0,
     results: ((data.foods || []) as Record<string, unknown>[]).map(stripFood),
   };
   if (SEARCH_CACHE.size >= 150) {
@@ -129,38 +162,55 @@ export async function searchUSDA(query: string, limit = 10, dataTypes?: string[]
 
 export async function lookupBarcodeOpenFoodFacts(upc: string): Promise<StrippedFood | null> {
   const res = await fetch(
-    `http://world.openfoodfacts.org/api/v2/product/${upc}.json?fields=product_name,brands,serving_size,serving_quantity,nutriments`,
+    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(upc)}.json?fields=product_name,brands,serving_size,serving_quantity,nutriments`,
+    {
+      headers: { 'User-Agent': 'MyNutri/1.0 (food lookup)' },
+      signal: AbortSignal.timeout(5000),
+    },
   );
 
   if (!res.ok) return null;
-
   const data = await res.json();
   if (data.status !== 1 || !data.product) return null;
 
-  const p = data.product;
-  const n = p.nutriments || {};
+  const product = data.product;
+  const nutrients = product.nutriments || {};
+  const servingQuantity = typeof product.serving_quantity === 'number'
+    && Number.isFinite(product.serving_quantity) && product.serving_quantity > 0
+    ? product.serving_quantity : null;
+  const hasServingNutrients = Object.keys(nutrients).some((key) => key.endsWith('_serving'));
+  const useServingBasis = servingQuantity !== null && hasServingNutrients;
+  const nutrientValue = (servingKey: string, per100Key: string): number | null => {
+    const value = useServingBasis ? nutrients[servingKey] : nutrients[per100Key];
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  };
+  const servingUnit = typeof product.serving_size === 'string'
+    ? product.serving_size.replace(/[0-9.]+\\s*/g, '').trim() || 'g'
+    : 'g';
 
   return {
     fdc_id: 0,
-    description: p.product_name || '',
-    brand: p.brands || '',
+    description: product.product_name || '',
+    brand: product.brands || '',
     upc,
-    serving_size: p.serving_quantity || null,
-    serving_unit: p.serving_size ? p.serving_size.replace(/[0-9.]+\s*/g, '').trim() || 'g' : 'g',
+    // Keep every nutrient on one basis: either the labelled serving or per 100 g.
+    serving_size: useServingBasis ? servingQuantity : 100,
+    serving_unit: useServingBasis ? servingUnit : 'g',
     data_type: 'OpenFoodFacts',
-    calories: typeof (n['energy-kcal_serving'] ?? n['energy-kcal_100g']) === 'number' ? Math.round((n['energy-kcal_serving'] ?? n['energy-kcal_100g']) * 10) / 10 : null,
-    protein_g: typeof (n.proteins_serving ?? n.proteins_100g) === 'number' ? Math.round((n.proteins_serving ?? n.proteins_100g) * 10) / 10 : null,
-    fat_g: typeof (n.fat_serving ?? n.fat_100g) === 'number' ? Math.round((n.fat_serving ?? n.fat_100g) * 10) / 10 : null,
-    carbs_g: typeof (n.carbohydrates_serving ?? n.carbohydrates_100g) === 'number' ? Math.round((n.carbohydrates_serving ?? n.carbohydrates_100g) * 10) / 10 : null,
-    sugar_g: typeof (n.sugars_serving ?? n.sugars_100g) === 'number' ? Math.round((n.sugars_serving ?? n.sugars_100g) * 10) / 10 : null,
-    sodium_mg: typeof (n.sodium_serving ?? n.sodium_100g) === 'number' ? Math.round((n.sodium_serving ?? n.sodium_100g) * 1000 * 10) / 10 : null,
-    fiber_g: typeof (n.fiber_serving ?? n.fiber_100g) === 'number' ? Math.round((n.fiber_serving ?? n.fiber_100g) * 10) / 10 : null,
+    calories: nutrientValue('energy-kcal_serving', 'energy-kcal_100g') === null ? null : Math.round((nutrientValue('energy-kcal_serving', 'energy-kcal_100g') as number) * 10) / 10,
+    protein_g: nutrientValue('proteins_serving', 'proteins_100g') === null ? null : Math.round((nutrientValue('proteins_serving', 'proteins_100g') as number) * 10) / 10,
+    fat_g: nutrientValue('fat_serving', 'fat_100g') === null ? null : Math.round((nutrientValue('fat_serving', 'fat_100g') as number) * 10) / 10,
+    carbs_g: nutrientValue('carbohydrates_serving', 'carbohydrates_100g') === null ? null : Math.round((nutrientValue('carbohydrates_serving', 'carbohydrates_100g') as number) * 10) / 10,
+    sugar_g: nutrientValue('sugars_serving', 'sugars_100g') === null ? null : Math.round((nutrientValue('sugars_serving', 'sugars_100g') as number) * 10) / 10,
+    sodium_mg: nutrientValue('sodium_serving', 'sodium_100g') === null ? null : Math.round((nutrientValue('sodium_serving', 'sodium_100g') as number) * 1000 * 10) / 10,
+    fiber_g: nutrientValue('fiber_serving', 'fiber_100g') === null ? null : Math.round((nutrientValue('fiber_serving', 'fiber_100g') as number) * 10) / 10,
     nutrient_values: {},
     nutrient_source: 'Open Food Facts',
   };
 }
 
 export async function lookupBarcode(upc: string): Promise<{ food: StrippedFood; source: string } | null> {
+  if (!isValidFoodBarcode(upc)) return null;
   if (process.env.FATSECRET_CLIENT_ID) {
     const { lookupBarcodeFatSecret } = await import('./fatsecret');
     const fs = await lookupBarcodeFatSecret(upc);

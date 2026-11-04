@@ -47,7 +47,7 @@ export const healthProfiles = tallySchema.table('health_profiles', {
 export const nutrientTargets = tallySchema.table('nutrient_targets', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
-  targets: jsonb('targets').$type<Record<string, number>>().notNull(),
+  targets: jsonb('targets').$type<Record<string, number | null>>().notNull(),
   createdAt: text('created_at').notNull().default(sql`now()::text`),
   updatedAt: text('updated_at').notNull().default(sql`now()::text`),
 });

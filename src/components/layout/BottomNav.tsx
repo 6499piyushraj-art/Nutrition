@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, BookOpen, Apple, UtensilsCrossed, TrendingUp, User } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Camera, ChartColumnIncreasing, MoreHorizontal } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Today', icon: LayoutDashboard },
   { href: '/diary', label: 'Diary', icon: BookOpen },
-  { href: '/my-foods', label: 'My Foods', icon: Apple },
-  { href: '/meals', label: 'Meals', icon: UtensilsCrossed },
-  { href: '/progress', label: 'Progress', icon: TrendingUp },
+  { href: '/photo-scanner', label: 'Scan', icon: Camera },
+  { href: '/analysis', label: 'Analysis', icon: ChartColumnIncreasing },
+  { href: '/more', label: 'More', icon: MoreHorizontal },
 ];
 
 export default function BottomNav() {

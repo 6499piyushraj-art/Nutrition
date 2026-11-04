@@ -14,8 +14,9 @@ interface DashboardData {
     goal_carbs_g: number | null;
     goal_fat_g: number | null;
   } | null;
-  totals: { calories: number; protein: number; carbs: number; fat: number };
+  totals: { calories: number | null; protein: number | null; carbs: number | null; fat: number | null };
   hasProfile: boolean;
+  isMinor: boolean;
 }
 
 export default function DashboardPage() {
@@ -96,9 +97,9 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <img src="/nutrients-mark.svg" alt="Nutrients" className="w-10 h-10" />
+          <img src="/mynutri-mark.svg" alt="MyNutri" className="w-10 h-10" />
           <div>
-            <p className="mb-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700">Nutrients</p>
+            <p className="mb-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700">MyNutri</p>
             <h1 className="text-lg font-bold text-gray-900">
               Hi, {data.user.first_name || 'there'}
             </h1>
@@ -115,7 +116,7 @@ export default function DashboardPage() {
       <NutrientTracker />
 
       {/* Quick actions */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className={`grid ${data.isMinor ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
         <Link href="/diary" className="bg-white rounded-xl p-4 shadow-sm text-center active:bg-gray-50 min-h-[72px] flex flex-col items-center justify-center">
           <BookOpen size={24} className="text-brand-600 mb-1" />
           <span className="text-sm font-medium text-gray-700">Food Diary</span>
@@ -124,7 +125,7 @@ export default function DashboardPage() {
           <Plus size={24} className="text-brand-600 mb-1" />
           <span className="text-sm font-medium text-gray-700">Log Food</span>
         </Link>
-        <LogWeightButton />
+        {!data.isMinor && <LogWeightButton />}
       </div>
 
       {/* Setup prompt if no profile */}

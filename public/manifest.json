@@ -1,14 +1,14 @@
 {
-  "name": "Nutrients — Daily Nutrition",
-  "short_name": "Nutrients",
-  "description": "A calmer way to track food, nutrients and everyday goals.",
+  "name": "MyNutri — Daily Nutrition",
+  "short_name": "MyNutri",
+  "description": "A private, source-aware food and nutrition tracker.",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#FFF8EB",
   "theme_color": "#55764E",
   "icons": [
     {
-      "src": "/nutrients-mark.svg",
+      "src": "/mynutri-mark.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"

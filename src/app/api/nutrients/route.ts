@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { db, schema } from '@/lib/db';
 import { and, eq } from 'drizzle-orm';
-import { getDefaultNutrientTargets, NUTRIENT_SPECS, type NutrientConfidence, type NutrientStatus } from '@/lib/nutrients';
+import { getDefaultNutrientTargets, getNutrientReferenceMetadata, NUTRIENT_SPECS, type NutrientConfidence, type NutrientStatus } from '@/lib/nutrients';
+import { isUnder18OrUnknown, validIsoDate } from '@/lib/nutrition-calculator';
 
 type FoodRow = {
   energyKcal: number | null;
@@ -51,7 +52,7 @@ async function readTargets(userId: string) {
     : {};
   return Object.fromEntries(NUTRIENT_SPECS.map((spec) => {
     const value = saved[spec.key];
-    return [spec.key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
+    return [spec.key, value === null ? null : typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
   })) as ReturnType<typeof getDefaultNutrientTargets>;
 }
 
@@ -62,7 +63,10 @@ export async function GET(request: Request) {
   const now = new Date();
   const defaultDate = String(now.getFullYear()) + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
   const date = searchParams.get('date') || defaultDate;
+  if (!validIsoDate(date)) return NextResponse.json({ error: 'date must be YYYY-MM-DD.' }, { status: 400 });
   try {
+    const profileAge = await db.select({ dateOfBirth: schema.healthProfiles.dateOfBirth, sex: schema.healthProfiles.sex }).from(schema.healthProfiles).where(eq(schema.healthProfiles.userId, session.user.id)).get();
+    const isMinor = isUnder18OrUnknown(profileAge?.dateOfBirth);
     const targets = await readTargets(session.user.id);
     const rows = await db.select({
       energyKcal: schema.foodEntries.energyKcal,
@@ -99,12 +103,13 @@ export async function GET(request: Request) {
       nutrition[spec.key] = { value, status, confidence: confidenceFor(sources), knownFoods, totalFoods: rows.length };
     }
     return NextResponse.json({
-      date, targets, nutrition, foodsLogged: rows.length,
+      date, targets: isMinor ? Object.fromEntries(Object.entries(targets).filter(([key]) => key !== 'calories')) : targets, nutrition: isMinor ? Object.fromEntries(Object.entries(nutrition).filter(([key]) => key !== 'calories')) : nutrition, foodsLogged: rows.length, isMinor,
       targetNotes: {
+        referenceSource: getNutrientReferenceMetadata(profileAge),
         valuesAreConfigurable: true,
         referenceNotPrescription: true,
         sodiumIsLimit: true,
-        microSourcePolicy: 'Only food-composition data attached to saved foods is counted; Gemini does not invent micronutrient values.',
+        microSourcePolicy: 'Food-composition values keep their source. Gemini-derived nutrient values are labelled AI-estimated and remain null when the model cannot estimate them reliably.',
       },
     }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
   } catch (err) {
@@ -129,13 +134,16 @@ export async function POST(request: Request) {
     const saved = previous?.targets && typeof previous.targets === 'object' && !Array.isArray(previous.targets)
       ? previous.targets as Record<string, unknown>
       : {};
-    const targets: Record<string, number> = Object.fromEntries(NUTRIENT_SPECS.map((spec) => {
+    const targets: Record<string, number | null> = Object.fromEntries(NUTRIENT_SPECS.map((spec) => {
       const value = saved[spec.key];
-      return [spec.key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
+      return [spec.key, value === null ? null : typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
     }));
     const allowed = new Set(NUTRIENT_SPECS.map((item) => item.key));
+    const dob = profile?.dateOfBirth;
+    const minor = isUnder18OrUnknown(dob);
     for (const [key, value] of Object.entries(body.targets as Record<string, unknown>)) {
-      if (!allowed.has(key as never)) continue;
+      if (!allowed.has(key as never) || (minor && key === 'calories')) continue;
+      if (value === null) { targets[key] = null; continue; }
       if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 10000000) {
         return NextResponse.json({ error: 'Target values must be finite, non-negative numbers.' }, { status: 400 });
       }
@@ -147,13 +155,7 @@ export async function POST(request: Request) {
     } else {
       await db.insert(schema.nutrientTargets).values({ userId: session.user.id, targets }).run();
     }
-    await db.update(schema.healthProfiles).set({
-      dailyCalorieGoal: targets.calories,
-      goalProteinG: targets.protein,
-      goalCarbsG: targets.carbs,
-      goalFatG: targets.fat,
-      goalFiberG: targets.fiber,
-    }).where(eq(schema.healthProfiles.userId, session.user.id)).run();
+
     return NextResponse.json({ success: true, targets });
   } catch (err) {
     return NextResponse.json({ error: 'Failed to save nutrient targets: ' + (err instanceof Error ? err.message : 'Unknown') }, { status: 500 });
