@@ -69,7 +69,16 @@ export default function ProfileForm({ profile, userId, userEmail, userName, isMi
   const [error, setError] = useState('');
 
   function update(field: string, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      if (field === 'unit_system' && value !== prev.unit_system && prev.goal_water_oz.trim()) {
+        const current = Number(prev.goal_water_oz);
+        if (Number.isFinite(current) && current >= 0) {
+          const converted = value === 'metric' ? current * 29.5735 : current / 29.5735;
+          return { ...prev, unit_system: value, goal_water_oz: String(Math.round(converted * 10) / 10) };
+        }
+      }
+      return { ...prev, [field]: value };
+    });
     setSaved(false);
   }
 
