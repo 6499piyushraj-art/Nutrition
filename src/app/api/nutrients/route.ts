@@ -52,7 +52,7 @@ async function readTargets(userId: string) {
     : {};
   return Object.fromEntries(NUTRIENT_SPECS.map((spec) => {
     const value = saved[spec.key];
-    return [spec.key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
+    return [spec.key, value === null ? null : typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
   })) as ReturnType<typeof getDefaultNutrientTargets>;
 }
 
