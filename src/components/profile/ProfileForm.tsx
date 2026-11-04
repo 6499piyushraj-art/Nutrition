@@ -39,6 +39,7 @@ interface Props {
 }
 
 export default function ProfileForm({ profile, userId, userEmail, userName, isMinor = false }: Props) {
+  const initialUnitSystem = profile?.unit_system || 'imperial';
   const [form, setForm] = useState({
     date_of_birth: profile?.date_of_birth || '',
     sex: profile?.sex || '',
@@ -49,7 +50,7 @@ export default function ProfileForm({ profile, userId, userEmail, userName, isMi
     goal_weight_lbs: profile?.goal_weight_lbs?.toString() || '',
     goal_target_date: profile?.goal_target_date || '',
     activity_level: profile?.activity_level || 'sedentary',
-    weekly_goal: profile?.weekly_goal || 'Lose 1 lb per week',
+    weekly_goal: profile?.weekly_goal || '',
     daily_calorie_goal: profile?.daily_calorie_goal?.toString() || '2400',
     goal_protein_g: profile?.goal_protein_g?.toString() || '80',
     goal_carbs_g: profile?.goal_carbs_g?.toString() || '300',
@@ -57,9 +58,9 @@ export default function ProfileForm({ profile, userId, userEmail, userName, isMi
     goal_fiber_g: profile?.goal_fiber_g?.toString() || '30',
     goal_sodium_mg: profile?.goal_sodium_mg?.toString() || '2300',
     goal_sugar_g: profile?.goal_sugar_g?.toString() || '50',
-    goal_water_oz: profile?.goal_water_oz?.toString() || '',
+    goal_water_oz: profile?.goal_water_oz == null ? '' : String(initialUnitSystem === 'metric' ? Math.round(profile.goal_water_oz * 29.5735) : profile.goal_water_oz),
     daily_step_goal: profile?.daily_step_goal?.toString() || '',
-    unit_system: profile?.unit_system || 'imperial',
+    unit_system: initialUnitSystem,
   });
 
 
@@ -100,7 +101,7 @@ export default function ProfileForm({ profile, userId, userEmail, userName, isMi
         })(),
         activity_level: form.activity_level || null,
         weekly_goal: form.weekly_goal || null,
-        goal_water_oz: form.goal_water_oz ? parseFloat(form.goal_water_oz) : null,
+        goal_water_oz: form.goal_water_oz ? parseFloat(form.goal_water_oz) * (form.unit_system === 'metric' ? 0.033814 : 1) : null,
         daily_step_goal: form.daily_step_goal ? parseInt(form.daily_step_goal) : null,
         unit_system: form.unit_system || 'imperial',
       };
@@ -202,9 +203,10 @@ export default function ProfileForm({ profile, userId, userEmail, userName, isMi
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Weekly Goal</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Optional weekly goal</label>
             <select value={form.weekly_goal} onChange={(e) => update('weekly_goal', e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">No goal selected</option>
               <option value="Lose 2 lbs per week">Lose 2 lbs/week</option>
               <option value="Lose 1.5 lbs per week">Lose 1.5 lbs/week</option>
               <option value="Lose 1 lb per week">Lose 1 lb/week</option>
@@ -263,7 +265,7 @@ export default function ProfileForm({ profile, userId, userEmail, userName, isMi
         <p className="mb-3 text-xs text-gray-500">Optional personal reminders. These are not nutrition prescriptions or exercise requirements.</p>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Water reminder (oz)</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Water reminder ({form.unit_system === 'metric' ? 'ml' : 'oz'})</label>
             <input type="number" min="0" max="1000" step="any" value={form.goal_water_oz} onChange={(e) => update('goal_water_oz', e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
