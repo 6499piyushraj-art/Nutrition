@@ -192,6 +192,7 @@ export async function lookupBarcodeOpenFoodFacts(upc: string): Promise<StrippedF
 }
 
 export async function lookupBarcode(upc: string): Promise<{ food: StrippedFood; source: string } | null> {
+  if (!/^(?:[0-9]{8}|[0-9]{12,14})$/.test(upc)) return null;
   if (process.env.FATSECRET_CLIENT_ID) {
     const { lookupBarcodeFatSecret } = await import('./fatsecret');
     const fs = await lookupBarcodeFatSecret(upc);
