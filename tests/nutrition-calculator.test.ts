@@ -67,7 +67,7 @@ test('uses the ICMR-NIN 2020 16–18 reference band for boys', () => {
 
 test('falls back to unclassified references for invalid birth dates', () => {
   const metadata = getNutrientReferenceMetadata({ dateOfBirth: '2009-02-30', sex: 'M' });
-  assert.equal(metadata.populationGroup, 'General starting values; age/sex-specific reference not selected');
+  assert.equal(metadata.populationGroup, 'Age/sex-specific reference not selected');
 });
 
 
