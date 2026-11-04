@@ -74,13 +74,15 @@ function stripFood(food: Record<string, unknown>): StrippedFood {
     if (/omega[- ]?6.*total|total.*omega[- ]?6/.test(name)) nutrientValues.omega6 = Math.round(grams * 10000) / 10000;
   }
   const dataType = String(food.dataType || 'FoodData Central');
+  const branded = dataType.toLowerCase() === 'branded';
+  const rawServingSize = typeof food.servingSize === 'number' && Number.isFinite(food.servingSize) && food.servingSize > 0 ? food.servingSize : null;
   return {
     fdc_id: food.fdcId as number,
     description: (food.description as string) || '',
     brand: (food.brandOwner as string) || (food.brandName as string) || '',
     upc: (food.gtinUpc as string) || '',
-    serving_size: (food.servingSize as number) || null,
-    serving_unit: (food.servingSizeUnit as string) || '',
+    serving_size: rawServingSize ?? (branded ? null : 100),
+    serving_unit: (typeof food.servingSizeUnit === 'string' && food.servingSizeUnit.trim()) || (branded ? '' : 'g'),
     data_type: (food.dataType as string) || '',
     calories: nutrients.calories ?? null,
     protein_g: nutrients.protein_g ?? null,
