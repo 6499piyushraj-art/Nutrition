@@ -6,6 +6,8 @@ import { NUTRIENT_SPECS } from '@/lib/nutrients';
 type Nutrient = { value: number | null; status: string; knownFoods: number; totalFoods: number; };
 type Summary = { period: string; from: string; to: string; days: Array<{ date: string; foodsLogged: number; nutrition: Record<string, Nutrient> }>; averages: Record<string, Nutrient>; };
 
+function localIsoDate() { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
+
 function fmt(value: number | null, unit: string) { return value == null ? 'Data incomplete' : `${Math.round(value * 100) / 100} ${unit}`; }
 
 export default function AnalysisPage() {
@@ -17,7 +19,7 @@ export default function AnalysisPage() {
   useEffect(() => {
     let active = true;
     setLoading(true); setError('');
-    fetch('/api/v1/diary/summary/' + period, { cache: 'no-store', credentials: 'same-origin' })
+    fetch('/api/v1/diary/summary/' + period + '?endDate=' + localIsoDate(), { cache: 'no-store', credentials: 'same-origin' })
       .then(async (res) => { const result = await res.json().catch(() => ({})); if (!res.ok) throw new Error(result.error || 'Could not load analysis'); return result as Summary; })
       .then((result) => { if (active) setData(result); })
       .catch((err) => { if (active) setError(err instanceof Error ? err.message : 'Could not load analysis'); })
