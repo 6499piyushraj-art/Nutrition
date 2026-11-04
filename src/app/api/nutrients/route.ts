@@ -136,7 +136,7 @@ export async function POST(request: Request) {
       : {};
     const targets: Record<string, number | null> = Object.fromEntries(NUTRIENT_SPECS.map((spec) => {
       const value = saved[spec.key];
-      return [spec.key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
+      return [spec.key, value === null ? null : typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : defaults[spec.key]];
     }));
     const allowed = new Set(NUTRIENT_SPECS.map((item) => item.key));
     const dob = profile?.dateOfBirth;
