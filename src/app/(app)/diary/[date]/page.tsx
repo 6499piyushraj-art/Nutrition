@@ -150,6 +150,12 @@ export default function DiaryDatePage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
+              href={'/my-foods?logDate=' + date}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 min-h-[40px] flex items-center justify-center"
+            >
+              My Foods
+            </Link>
+            <Link
               href={'/my-foods/add?logDate=' + date}
               className="rounded-lg border border-brand-300 bg-white px-3 py-2 text-xs font-semibold text-brand-700 min-h-[40px] flex items-center justify-center"
             >
