@@ -16,8 +16,11 @@ type JsonObject = Record<string, unknown>;
 type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
 type Candidate = { model: string; json: JsonObject; attemptedModels: string[] };
 const NUTRIENT_KEYS = [
-  'omega3', 'calcium', 'iron', 'zinc', 'vitamin_d',
-  'b12', 'folate', 'vitamin_c', 'vitamin_a', 'iodine',
+  'omega3', 'omega6', 'calcium', 'iron', 'zinc', 'vitamin_d',
+  'b12', 'folate', 'vitamin_c', 'vitamin_a', 'iodine', 'phosphorus',
+  'magnesium', 'potassium', 'sodium', 'chloride', 'copper', 'manganese',
+  'selenium', 'fluoride', 'chromium', 'molybdenum', 'vitamin_e', 'vitamin_k',
+  'b1', 'b2', 'b3', 'b5', 'b6', 'biotin',
 ] as const;
 const NUMERIC_FIELDS = [
   'default_serving_size', 'energy_kcal', 'protein_g', 'fat_g',
@@ -195,12 +198,12 @@ const NUTRITION_PROMPT = [
   'Do not invent foods, quantities, brands, or fortification.',
   'Return a single JSON object with these exact keys:',
   'description, brand_name, default_serving_size, default_serving_unit, energy_kcal, protein_g, fat_g, saturated_fat_g, carbs_g, fiber_g, sugar_g, sodium_mg, cholesterol_mg, nutrient_values, nutrient_source.',
-  'nutrient_values must use these exact keys: omega3, calcium, iron, zinc, vitamin_d, b12, folate, vitamin_c, vitamin_a, iodine.',
-  'Units: omega3 in g; calcium, iron, zinc, vitamin_c in mg; vitamin_d, b12, folate, vitamin_a and iodine in micrograms; macros in g; energy in kcal; sodium and cholesterol in mg.',
-  'Estimate all ten micronutrients for identifiable common foods. Do not use null only because no nutrition label is present.',
-  'Use zero for a nutrient that is reasonably absent; use null only when truly not estimable. Never use negative numbers.',
+  'nutrient_values may use these keys only: omega3, omega6, calcium, iron, zinc, vitamin_d, b12, folate, vitamin_c, vitamin_a, iodine, phosphorus, magnesium, potassium, sodium, chloride, copper, manganese, selenium, fluoride, chromium, molybdenum, vitamin_e, vitamin_k, b1, b2, b3, b5, b6, biotin.',
+  'Units: omega3 and omega6 in g; calcium, iron, zinc, vitamin_c, phosphorus, magnesium, potassium, sodium and chloride in mg; copper and selenium in micrograms; vitamin_d, b12, folate, vitamin_a, iodine, fluoride, chromium, molybdenum, vitamin_k and biotin in micrograms; vitamin_e and B1/B2/B3/B5/B6 in mg; macros in g; energy in kcal; cholesterol in mg.',
+  'Provide a micronutrient estimate only when the food and portion make a reasonably supported estimate possible. Otherwise use null. Clearly distinguish estimates from verified composition data.',
+  'Never use zero as a placeholder for missing or uncertain information. Use zero only when a source explicitly reports zero or the nutrient is reliably known to be absent. Use null when unknown. Never use negative numbers.',
   'Estimate totals for all foods in a multi-food log, keeping units and portions consistent.',
-  'Set nutrient_source to Gemini AI estimate. JSON only, no markdown.',
+  'Set nutrient_source to Gemini AI estimate. Do not claim laboratory or official database accuracy. JSON only, no markdown.',
 ].join(' ');
 
 export async function runGeminiNutritionJury(
