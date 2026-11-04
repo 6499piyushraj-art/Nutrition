@@ -170,28 +170,40 @@ export async function lookupBarcodeOpenFoodFacts(upc: string): Promise<StrippedF
   );
 
   if (!res.ok) return null;
-
   const data = await res.json();
   if (data.status !== 1 || !data.product) return null;
 
-  const p = data.product;
-  const n = p.nutriments || {};
+  const product = data.product;
+  const nutrients = product.nutriments || {};
+  const servingQuantity = typeof product.serving_quantity === 'number'
+    && Number.isFinite(product.serving_quantity) && product.serving_quantity > 0
+    ? product.serving_quantity : null;
+  const hasServingNutrients = Object.keys(nutrients).some((key) => key.endsWith('_serving'));
+  const useServingBasis = servingQuantity !== null && hasServingNutrients;
+  const nutrientValue = (servingKey: string, per100Key: string): number | null => {
+    const value = useServingBasis ? nutrients[servingKey] : nutrients[per100Key];
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  };
+  const servingUnit = typeof product.serving_size === 'string'
+    ? product.serving_size.replace(/[0-9.]+\\s*/g, '').trim() || 'g'
+    : 'g';
 
   return {
     fdc_id: 0,
-    description: p.product_name || '',
-    brand: p.brands || '',
+    description: product.product_name || '',
+    brand: product.brands || '',
     upc,
-    serving_size: p.serving_quantity || null,
-    serving_unit: p.serving_size ? p.serving_size.replace(/[0-9.]+\s*/g, '').trim() || 'g' : 'g',
+    // Keep every nutrient on one basis: either the labelled serving or per 100 g.
+    serving_size: useServingBasis ? servingQuantity : 100,
+    serving_unit: useServingBasis ? servingUnit : 'g',
     data_type: 'OpenFoodFacts',
-    calories: typeof (n['energy-kcal_serving'] ?? n['energy-kcal_100g']) === 'number' ? Math.round((n['energy-kcal_serving'] ?? n['energy-kcal_100g']) * 10) / 10 : null,
-    protein_g: typeof (n.proteins_serving ?? n.proteins_100g) === 'number' ? Math.round((n.proteins_serving ?? n.proteins_100g) * 10) / 10 : null,
-    fat_g: typeof (n.fat_serving ?? n.fat_100g) === 'number' ? Math.round((n.fat_serving ?? n.fat_100g) * 10) / 10 : null,
-    carbs_g: typeof (n.carbohydrates_serving ?? n.carbohydrates_100g) === 'number' ? Math.round((n.carbohydrates_serving ?? n.carbohydrates_100g) * 10) / 10 : null,
-    sugar_g: typeof (n.sugars_serving ?? n.sugars_100g) === 'number' ? Math.round((n.sugars_serving ?? n.sugars_100g) * 10) / 10 : null,
-    sodium_mg: typeof (n.sodium_serving ?? n.sodium_100g) === 'number' ? Math.round((n.sodium_serving ?? n.sodium_100g) * 1000 * 10) / 10 : null,
-    fiber_g: typeof (n.fiber_serving ?? n.fiber_100g) === 'number' ? Math.round((n.fiber_serving ?? n.fiber_100g) * 10) / 10 : null,
+    calories: nutrientValue('energy-kcal_serving', 'energy-kcal_100g') === null ? null : Math.round((nutrientValue('energy-kcal_serving', 'energy-kcal_100g') as number) * 10) / 10,
+    protein_g: nutrientValue('proteins_serving', 'proteins_100g') === null ? null : Math.round((nutrientValue('proteins_serving', 'proteins_100g') as number) * 10) / 10,
+    fat_g: nutrientValue('fat_serving', 'fat_100g') === null ? null : Math.round((nutrientValue('fat_serving', 'fat_100g') as number) * 10) / 10,
+    carbs_g: nutrientValue('carbohydrates_serving', 'carbohydrates_100g') === null ? null : Math.round((nutrientValue('carbohydrates_serving', 'carbohydrates_100g') as number) * 10) / 10,
+    sugar_g: nutrientValue('sugars_serving', 'sugars_100g') === null ? null : Math.round((nutrientValue('sugars_serving', 'sugars_100g') as number) * 10) / 10,
+    sodium_mg: nutrientValue('sodium_serving', 'sodium_100g') === null ? null : Math.round((nutrientValue('sodium_serving', 'sodium_100g') as number) * 1000 * 10) / 10,
+    fiber_g: nutrientValue('fiber_serving', 'fiber_100g') === null ? null : Math.round((nutrientValue('fiber_serving', 'fiber_100g') as number) * 10) / 10,
     nutrient_values: {},
     nutrient_source: 'Open Food Facts',
   };
